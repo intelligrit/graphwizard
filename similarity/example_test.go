@@ -109,5 +109,16 @@ func ExampleSimRank() {
 	// Output: sim(0,1) = 0.40
 }
 
+func ExampleJaccardAllParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	results := similarity.JaccardAllParallel(g, 0.1)
+	fmt.Printf("pairs above threshold: %d\n", len(results))
+	// Output: pairs above threshold: 3
+}
+
 // Ensure unused imports.
 var _ = math.Inf

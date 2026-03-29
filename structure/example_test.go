@@ -125,3 +125,27 @@ func ExampleAverageClusteringCoefficient() {
 	fmt.Printf("avg CC: %.1f\n", avg)
 	// Output: avg CC: 1.0
 }
+
+func ExampleTriangleCountParallel() {
+	g := simple.NewUndirectedGraph()
+	for i := int64(0); i < 4; i++ {
+		for j := i + 1; j < 4; j++ {
+			g.SetEdge(g.NewEdge(simple.Node(i), simple.Node(j)))
+		}
+	}
+
+	_, total := structure.TriangleCountParallel(g)
+	fmt.Printf("triangles: %d\n", total)
+	// Output: triangles: 4
+}
+
+func ExampleClusteringCoefficientParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	coeffs := structure.ClusteringCoefficientParallel(g)
+	fmt.Printf("CC(0) = %.1f\n", coeffs[0])
+	// Output: CC(0) = 1.0
+}

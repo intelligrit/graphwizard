@@ -161,5 +161,37 @@ func ExampleOutDegree() {
 	// Output: node0=1.00
 }
 
+func ExampleApproximateBetweenness() {
+	g := simple.NewUndirectedGraph()
+	for i := int64(1); i <= 4; i++ {
+		g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(i)))
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	scores := centrality.ApproximateBetweenness(g, 5, rng)
+	fmt.Printf("center highest: %v\n", scores[0] > scores[1])
+	// Output: center highest: true
+}
+
+func ExampleEccentricityParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	ecc := centrality.EccentricityParallel(g)
+	fmt.Printf("endpoint=%.0f center=%.0f\n", ecc[0], ecc[1])
+	// Output: endpoint=2 center=1
+}
+
+func ExampleDiameterParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	d := centrality.DiameterParallel(g)
+	fmt.Printf("diameter=%.0f\n", d)
+	// Output: diameter=2
+}
+
 // Ensure unused imports are valid.
 var _ = math.Inf

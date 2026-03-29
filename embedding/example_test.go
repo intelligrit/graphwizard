@@ -40,3 +40,30 @@ func ExampleEmbed() {
 	fmt.Printf("dim: %d\n", len(emb[0]))
 	// Output: dim: 2
 }
+
+func ExampleNode2VecWalksParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	walks := embedding.Node2VecWalksParallel(g, embedding.WalkParams{
+		WalkLength:   5,
+		WalksPerNode: 2,
+		P:            1.0,
+		Q:            1.0,
+	}, 42)
+
+	fmt.Printf("walks: %d\n", len(walks))
+	// Output: walks: 6
+}
+
+func ExampleDeepWalkWalksParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	walks := embedding.DeepWalkWalksParallel(g, 10, 3, 42)
+	fmt.Printf("walks: %d\n", len(walks))
+	// Output: walks: 9
+}
