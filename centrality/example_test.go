@@ -5,6 +5,7 @@ package centrality_test
 import (
 	"fmt"
 	"math"
+	"math/rand"
 
 	"github.com/intelligrit/graphwizard/centrality"
 	"gonum.org/v1/gonum/graph/path"
@@ -116,6 +117,48 @@ func ExampleEccentricity() {
 	ecc := centrality.Eccentricity(g)
 	fmt.Printf("center ecc=%.0f, endpoint ecc=%.0f\n", ecc[1], ecc[0])
 	// Output: center ecc=1, endpoint ecc=2
+}
+
+func ExampleInfluenceMaximization() {
+	g := simple.NewUndirectedGraph()
+	for i := int64(1); i <= 4; i++ {
+		g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(i)))
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	seeds, influence := centrality.InfluenceMaximization(g, 1, 0.5, 200, rng)
+	fmt.Printf("seed: %d, influence: %.1f+\n", seeds[0], math.Floor(influence))
+	// Output: seed: 0, influence: 3.0+
+}
+
+func ExamplePersonalizedPageRankUndirected() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scores := centrality.PersonalizedPageRankUndirected(g, 0, 0.85, 1e-6, 100)
+	fmt.Printf("seed > far: %v\n", scores[0] > scores[2])
+	// Output: seed > far: true
+}
+
+func ExampleInDegree() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(1)))
+
+	scores := centrality.InDegree(g)
+	fmt.Printf("node1=%.2f\n", scores[1])
+	// Output: node1=1.00
+}
+
+func ExampleOutDegree() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
+
+	scores := centrality.OutDegree(g)
+	fmt.Printf("node0=%.2f\n", scores[0])
+	// Output: node0=1.00
 }
 
 // Ensure unused imports are valid.

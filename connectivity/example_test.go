@@ -75,3 +75,47 @@ func ExampleArticulationPoints() {
 	fmt.Printf("cut vertices: %d\n", len(aps))
 	// Output: cut vertices: 1
 }
+
+func ExampleTopologicalSort() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	order, ok := connectivity.TopologicalSort(g)
+	fmt.Printf("ok: %v, first: %d\n", ok, order[0])
+	// Output: ok: true, first: 0
+}
+
+func ExampleStronglyConnectedComponents() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
+
+	comps := connectivity.StronglyConnectedComponents(g)
+	fmt.Printf("SCCs: %d\n", len(comps))
+	// Output: SCCs: 3
+}
+
+func ExampleDegeneracyOrdering() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	order, layers := connectivity.DegeneracyOrdering(g)
+	fmt.Printf("nodes: %d, layers: %d\n", len(order), len(layers))
+	// Output: nodes: 3, layers: 3
+}
+
+func ExampleBiconnectedComponents() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
+
+	comps := connectivity.BiconnectedComponents(g)
+	fmt.Printf("biconnected components: %d\n", len(comps))
+	// Output: biconnected components: 2
+}

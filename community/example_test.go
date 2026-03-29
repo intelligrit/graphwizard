@@ -7,6 +7,7 @@ import (
 	"math/rand"
 
 	"github.com/intelligrit/graphwizard/community"
+	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 )
 
@@ -56,4 +57,37 @@ func ExampleLouvain() {
 	comms := community.Louvain(g, 1.0, nil)
 	fmt.Printf("nodes: %d\n", len(comms))
 	// Output: nodes: 3
+}
+
+func ExampleSpectralClustering() {
+	g := simple.NewUndirectedGraph()
+	// Two disconnected triangles.
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(4)))
+	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
+	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(3)))
+
+	clusters := community.SpectralClustering(g, 2)
+	// Count distinct labels.
+	labels := make(map[int]bool)
+	for _, c := range clusters {
+		labels[c] = true
+	}
+	fmt.Printf("clusters: %d\n", len(labels))
+	// Output: clusters: 2
+}
+
+func ExampleLouvainQ() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	q := community.LouvainQ(g, [][]graph.Node{
+		{simple.Node(0), simple.Node(1), simple.Node(2)},
+	}, 1.0)
+	fmt.Printf("Q >= 0: %v\n", q >= 0)
+	// Output: Q >= 0: true
 }

@@ -68,3 +68,60 @@ func ExampleMaximalCliques() {
 	fmt.Printf("cliques: %d, size: %d\n", len(cliques), len(cliques[0]))
 	// Output: cliques: 1, size: 3
 }
+
+func ExamplePrim() {
+	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 2))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(0), 3))
+
+	mst := structure.Prim(g, 0)
+	fmt.Printf("MST edges: %d, weight: %.0f\n", len(mst.Edges), mst.Weight)
+	// Output: MST edges: 2, weight: 3
+}
+
+func ExampleBipartiteProject() {
+	// Providers 0,1 share organizations 10,11.
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(10)))
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(11)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(10)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(11)))
+
+	proj := structure.BipartiteProject(g, []int64{0, 1})
+	w, _ := proj.Weight(0, 1)
+	fmt.Printf("co-affiliations: %.0f\n", w)
+	// Output: co-affiliations: 2
+}
+
+func ExampleGraphColoring() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	colors, k, _ := structure.GraphColoring(g)
+	fmt.Printf("chromatic number: %d, colors: %d\n", k, len(colors))
+	// Output: chromatic number: 2, colors: 3
+}
+
+func ExampleTSP() {
+	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(0), 1))
+
+	result := structure.TSP(g)
+	fmt.Printf("tour weight: %.0f\n", result.Weight)
+	// Output: tour weight: 3
+}
+
+func ExampleAverageClusteringCoefficient() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	avg := structure.AverageClusteringCoefficient(g)
+	fmt.Printf("avg CC: %.1f\n", avg)
+	// Output: avg CC: 1.0
+}
