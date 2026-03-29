@@ -81,21 +81,21 @@ func ExamplePreferentialAttachment() {
 }
 
 func ExamplePredictLinks() {
+	// Triangle with one missing edge: 0-2 is the clear prediction.
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
-	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
-	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 
 	scorer := func(g graph.Undirected, u, v int64) float64 {
-		return similarity.AdamicAdar(g, u, v)
+		return float64(similarity.CommonNeighbors(g, u, v))
 	}
-	preds := similarity.PredictLinks(g, 2, scorer)
-	fmt.Printf("top prediction: %d-%d\n", preds[0].A, preds[0].B)
-	// Output: top prediction: 0-2
+	preds := similarity.PredictLinks(g, 1, scorer)
+	fmt.Printf("predicted: %d-%d (CN=%d)\n", preds[0].A, preds[0].B, int(preds[0].Score))
+	// Output: predicted: 0-2 (CN=1)
 }
 
 func ExampleSimRank() {
+	// Nodes 0 and 1 both receive edges from the same sources (2 and 3).
 	g := simple.NewDirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(1)))
@@ -103,8 +103,10 @@ func ExampleSimRank() {
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(1)))
 
 	sim := similarity.SimRank(g, 0.8, 10)
-	fmt.Printf("sim(0,1) > 0: %v\n", sim[[2]int64{0, 1}] > 0)
-	// Output: sim(0,1) > 0: true
+	// Nodes 0 and 1 have the same in-neighbors, so they are structurally similar.
+	s := sim[[2]int64{0, 1}]
+	fmt.Printf("sim(0,1) = %.2f\n", s)
+	// Output: sim(0,1) = 0.40
 }
 
 // Ensure unused imports.
