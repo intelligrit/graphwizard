@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/intelligrit/graphwizard/centrality"
+	"github.com/intelligrit/graphwizard/community"
+	"github.com/intelligrit/graphwizard/connectivity"
 	"github.com/intelligrit/graphwizard/embedding"
 	"github.com/intelligrit/graphwizard/similarity"
 	"github.com/intelligrit/graphwizard/structure"
@@ -240,6 +242,64 @@ func BenchmarkExactBetweenness_1K(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		centrality.Betweenness(g)
+	}
+}
+
+// --- Parallel vs Sequential: new algorithms ---
+
+func BenchmarkLeiden_Sequential_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := TwoClusterGraph(50, 0.3, 0.01, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.Leiden(g, 1.0, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+func BenchmarkLeiden_Parallel_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := TwoClusterGraph(50, 0.3, 0.01, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.LeidenParallel(g, 1.0, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+func BenchmarkKatz_Sequential_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	ug := BarabasiAlbert(1000, 3, rng)
+	dg := toDirected(ug)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		centrality.Katz(dg, 0.01, 1.0, 1e-6, 50)
+	}
+}
+
+func BenchmarkKatz_Parallel_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	ug := BarabasiAlbert(1000, 3, rng)
+	dg := toDirected(ug)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		centrality.KatzParallel(dg, 0.01, 1.0, 1e-6, 50)
+	}
+}
+
+func BenchmarkBridges_Sequential_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(1000, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		connectivity.Bridges(g)
+	}
+}
+
+func BenchmarkBridges_Parallel_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(1000, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		connectivity.BridgesParallel(g)
 	}
 }
 

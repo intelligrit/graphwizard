@@ -105,6 +105,13 @@ func main() {
 }
 ```
 
+## Best Practices
+
+See **[BEST_PRACTICES.md](BEST_PRACTICES.md)** for detailed guidance on:
+choosing algorithm variants for your graph size, loading from SQL,
+anomaly detection pipelines, streaming updates, performance tips, and
+a complexity reference table for every algorithm.
+
 ## Design Principles
 
 - **One import per domain.** No need to learn gonum's iterator patterns or

@@ -3,6 +3,8 @@
 package similarity
 
 import (
+	"sort"
+
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -24,6 +26,7 @@ func SimRank(g graph.Directed, decay float64, maxIter int) map[[2]int64]float64 
 	for nodes.Next() {
 		ids = append(ids, nodes.Node().ID())
 	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	n := len(ids)
 	if n == 0 {
 		return make(map[[2]int64]float64)

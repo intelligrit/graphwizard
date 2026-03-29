@@ -1,0 +1,182 @@
+# GraphWizard Best Practices
+
+Practical guidance for using GraphWizard effectively on real-world
+graphs, from small exploratory analysis to 5M+ node production
+workloads.
+
+## Choosing the Right Algorithm Variant
+
+Most algorithms have both sequential and parallel versions. Use this
+guide:
+
+| Graph Size | Recommendation |
+|---|---|
+| < 1K nodes | Sequential — goroutine overhead exceeds benefit |
+| 1K–100K nodes | Parallel for O(V^2) algorithms (triangles, clustering, similarity) |
+| 100K+ nodes | Always use parallel variants; avoid O(V^2) algorithms entirely |
+
+**Specific guidance:**
+
+- **Betweenness centrality**: Use `ApproximateBetweenness` with
+  k=1000 for any graph over 10K nodes. Exact betweenness is O(VE)
+  and takes years on million-node graphs.
+
+- **Community detection**: `Leiden` is the best default. `Louvain`
+  is faster but doesn't guarantee well-connected communities.
+  `LabelPropagation` is fastest but non-deterministic and can produce
+  poor results on some topologies. `SpectralClustering` is best for
+  small graphs (< 10K) where you know the number of clusters.
+
+- **All-pairs similarity** (`JaccardAll`, `PredictLinks`): Only
+  practical for graphs under 50K nodes (O(V^2) pairs). For larger
+  graphs, compute pairwise similarity only for nodes sharing a
+  neighbor.
+
+## Loading Graphs from SQL
+
+Use the `loader` package to avoid reimplementing SQL-to-graph
+conversion:
+
+```go
+import (
+    "database/sql"
+    "github.com/intelligrit/graphwizard/loader"
+    _ "github.com/marcboeker/go-duckdb/v2"
+)
+
+db, _ := sql.Open("duckdb", "analytics.duckdb")
+
+// Unweighted graph.
+g, err := loader.LoadUndirected(db,
+    "SELECT from_id, to_id FROM affiliations")
+
+// Weighted graph.
+wg, err := loader.LoadWeightedUndirected(db,
+    "SELECT provider_npi, drug_name, total_claims FROM prescriptions")
+```
+
+The query must return exactly 2 columns (from_id, to_id) for
+unweighted, or 3 columns (from_id, to_id, weight) for weighted.
+Column types must be scannable to int64 and float64.
+
+## Writing Results Back
+
+After running algorithms, write results back to your database:
+
+```go
+scores := centrality.ApproximateBetweenness(g, 1000, rng)
+loader.WriteResults(db, "betweenness_scores", scores)
+
+comms := community.Leiden(g, 1.0, rng)
+loader.WriteCommunities(db, "communities", comms)
+```
+
+## Subgraph Extraction for Dashboards
+
+Don't load the entire graph for per-provider views. Extract the
+relevant neighborhood:
+
+```go
+// Get 2-hop neighborhood of a provider.
+sub := subgraph.NHopNeighborhoodUndirected(fullGraph, providerNPI, 2)
+
+// Run algorithms on just this subgraph.
+scores := centrality.Degree(sub)
+```
+
+## Streaming Updates
+
+For real-time analysis where the graph changes incrementally:
+
+```go
+sg := stream.New()
+sg.AddEdge(100, 200, 1.0)
+sg.AddEdge(200, 300, 2.0)
+
+// Get the graph for algorithm use.
+g := sg.Graph()
+comms := community.Louvain(g, 1.0, nil)
+
+// Later, apply changes without rebuilding.
+sg.AddEdge(300, 400, 1.5)
+sg.RemoveEdge(100, 200)
+
+// Check what changed.
+changes := sg.Changes()
+```
+
+## Anomaly Detection Pipeline
+
+For fraud detection, combine multiple signals:
+
+```go
+// 1. Structural anomaly scores.
+iso := anomaly.IsolationScore(g)
+outliers := anomaly.StructuralOutliers(g, 100)
+
+// 2. Community-based: nodes bridging multiple communities.
+comms := community.Leiden(g, 1.0, rng)
+bridges := connectivity.Bridges(g)
+
+// 3. Centrality-based: unusual influence patterns.
+ppr := centrality.PersonalizedPageRank(dg, seedNode, 0.85, 1e-6, 100)
+approxBetween := centrality.ApproximateBetweenness(g, 1000, rng)
+
+// 4. Link prediction: find hidden connections.
+predicted := similarity.PredictLinks(g, 100, similarity.AdamicAdar)
+```
+
+## Graph Diffing for Change Detection
+
+Compare snapshots to detect changes over time:
+
+```go
+before, _ := loader.LoadUndirected(db, "SELECT * FROM edges_jan")
+after, _ := loader.LoadUndirected(db, "SELECT * FROM edges_feb")
+
+result := diff.Compare(before, after)
+fmt.Printf("New edges: %d, Removed: %d\n",
+    len(result.AddedEdges), len(result.RemovedEdges))
+```
+
+## Performance Tips
+
+1. **Pre-build neighbor sets** if you're calling multiple similarity
+   functions on the same graph. The parallel variants do this
+   internally.
+
+2. **Use `runtime.GOMAXPROCS`** to control parallelism. The parallel
+   variants auto-detect available cores but you can tune this for
+   shared environments.
+
+3. **Graph implementations must be safe for concurrent reads** when
+   using parallel functions. gonum's `simple.*Graph` types satisfy
+   this requirement.
+
+4. **For DuckDB**, use `?access_mode=READ_ONLY` when loading to
+   allow concurrent readers.
+
+5. **Memory estimation**: A gonum undirected graph uses roughly
+   100-200 bytes per edge. A 5.8M node / 82.6M edge graph needs
+   ~10-16 GB of RAM.
+
+## Algorithm Complexity Reference
+
+| Algorithm | Time | Space | Parallelizable |
+|---|---|---|---|
+| BFS/DFS | O(V+E) | O(V) | No |
+| Bridges | O(V+E) | O(V) | Per-component |
+| WCC/SCC | O(V+E) | O(V) | No |
+| PageRank | O(k(V+E)) | O(V) | Per-iteration |
+| Betweenness (exact) | O(VE) | O(V+E) | Per-source |
+| Betweenness (approx) | O(kE) | O(V+E) | Per-source |
+| Leiden/Louvain | ~O(V+E) | O(V+E) | Limited |
+| Katz/PPR | O(k(V+E)) | O(V) | Per-node |
+| Triangle count | O(V·d²) | O(V+E) | Per-node |
+| Clustering coeff | O(V·d²) | O(V+E) | Per-node |
+| MST (Kruskal) | O(E log E) | O(V+E) | No |
+| Hopcroft-Karp | O(E√V) | O(V+E) | No |
+| Yen K-shortest | O(KV(V log V + E)) | O(V+E) | Per-spur |
+| SimRank | O(kV²d²) | O(V²) | Per-iteration |
+| Node2Vec walks | O(walks·length) | O(walks·length) | Per-walk |
+| Spectral clustering | O(V³) | O(V²) | Limited |
