@@ -26,8 +26,8 @@ func TestPersonalizedPageRank_Star(t *testing.T) {
 func TestPersonalizedPageRank_Empty(t *testing.T) {
 	g := simple.NewDirectedGraph()
 	scores := PersonalizedPageRank(g, 0, 0.85, 1e-6, 100)
-	if scores != nil {
-		t.Errorf("expected nil for empty graph")
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for empty graph")
 	}
 }
 
@@ -35,8 +35,8 @@ func TestPersonalizedPageRank_MissingSeed(t *testing.T) {
 	g := simple.NewDirectedGraph()
 	g.AddNode(simple.Node(0))
 	scores := PersonalizedPageRank(g, 99, 0.85, 1e-6, 100)
-	if scores != nil {
-		t.Errorf("expected nil for missing seed")
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for missing seed")
 	}
 }
 
@@ -60,8 +60,8 @@ func TestPersonalizedPageRankUndirected_Chain(t *testing.T) {
 func TestPersonalizedPageRankUndirected_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	scores := PersonalizedPageRankUndirected(g, 0, 0.85, 1e-6, 100)
-	if scores != nil {
-		t.Errorf("expected nil for empty graph")
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for empty graph")
 	}
 }
 
@@ -69,7 +69,7 @@ func TestPersonalizedPageRankUndirected_MissingSeed(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.AddNode(simple.Node(0))
 	scores := PersonalizedPageRankUndirected(g, 99, 0.85, 1e-6, 100)
-	if scores != nil {
-		t.Errorf("expected nil for missing seed")
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for missing seed")
 	}
 }

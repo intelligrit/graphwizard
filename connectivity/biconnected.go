@@ -47,50 +47,92 @@ func BiconnectedComponents(g graph.Undirected) [][]Edge {
 	return components
 }
 
-func biconnDFS(g graph.Undirected, u, parent int64, visited map[int64]bool, disc, low map[int64]int, timer *int, stack *[]Edge, components *[][]Edge) {
-	visited[u] = true
-	disc[u] = *timer
-	low[u] = *timer
+// biconnFrame is a stack frame for iterative biconnected-component DFS.
+type biconnFrame struct {
+	u         int64
+	parent    int64
+	neighbors []int64
+	idx       int
+	children  int
+}
+
+func biconnDFS(g graph.Undirected, root, parent int64, visited map[int64]bool, disc, low map[int64]int, timer *int, stack *[]Edge, components *[][]Edge) {
+	// Iterative DFS using explicit stack to avoid stack overflow.
+	callStack := []biconnFrame{{u: root, parent: parent, neighbors: collectNeighborIDs(g, root)}}
+	visited[root] = true
+	disc[root] = *timer
+	low[root] = *timer
 	*timer++
-	children := 0
 
-	neighbors := g.From(u)
-	for neighbors.Next() {
-		v := neighbors.Node().ID()
-		if !visited[v] {
-			children++
-			*stack = append(*stack, Edge{From: u, To: v})
-			biconnDFS(g, v, u, visited, disc, low, timer, stack, components)
+	for len(callStack) > 0 {
+		top := &callStack[len(callStack)-1]
 
-			if low[v] < low[u] {
-				low[u] = low[v]
-			}
+		if top.idx < len(top.neighbors) {
+			v := top.neighbors[top.idx]
+			top.idx++
 
-			// u is an articulation point: pop a component.
-			if (parent == -1 && children > 1) || (parent != -1 && low[v] >= disc[u]) {
-				var comp []Edge
-				for {
-					if len(*stack) == 0 {
-						break
-					}
-					e := (*stack)[len(*stack)-1]
-					*stack = (*stack)[:len(*stack)-1]
-					comp = append(comp, e)
-					if e.From == u && e.To == v {
-						break
-					}
-				}
-				if len(comp) > 0 {
-					*components = append(*components, comp)
+			if !visited[v] {
+				top.children++
+				*stack = append(*stack, Edge{From: top.u, To: v})
+
+				visited[v] = true
+				disc[v] = *timer
+				low[v] = *timer
+				*timer++
+
+				callStack = append(callStack, biconnFrame{
+					u:         v,
+					parent:    top.u,
+					neighbors: collectNeighborIDs(g, v),
+				})
+			} else if v != top.parent && disc[v] < disc[top.u] {
+				*stack = append(*stack, Edge{From: top.u, To: v})
+				if disc[v] < low[top.u] {
+					low[top.u] = disc[v]
 				}
 			}
-		} else if v != parent && disc[v] < disc[u] {
-			*stack = append(*stack, Edge{From: u, To: v})
-			if disc[v] < low[u] {
-				low[u] = disc[v]
+		} else {
+			// Done with this node; pop and update parent.
+			finished := *top
+			callStack = callStack[:len(callStack)-1]
+
+			if len(callStack) > 0 {
+				parentFrame := &callStack[len(callStack)-1]
+				if low[finished.u] < low[parentFrame.u] {
+					low[parentFrame.u] = low[finished.u]
+				}
+
+				// Check if parentFrame.u is an articulation point via this child.
+				isRoot := parentFrame.parent == -1
+				if (isRoot && parentFrame.children > 1) || (!isRoot && low[finished.u] >= disc[parentFrame.u]) {
+					var comp []Edge
+					for {
+						if len(*stack) == 0 {
+							break
+						}
+						e := (*stack)[len(*stack)-1]
+						*stack = (*stack)[:len(*stack)-1]
+						comp = append(comp, e)
+						if e.From == parentFrame.u && e.To == finished.u {
+							break
+						}
+					}
+					if len(comp) > 0 {
+						*components = append(*components, comp)
+					}
+				}
 			}
 		}
 	}
+}
+
+func collectNeighborIDs(g graph.Undirected, id int64) []int64 {
+	var result []int64
+	it := g.From(id)
+	for it.Next() {
+		result = append(result, it.Node().ID())
+	}
+	return result
 }
 
 // ArticulationPoints returns all articulation points (cut vertices) in an
@@ -118,31 +160,64 @@ func ArticulationPoints(g graph.Undirected) []int64 {
 	return result
 }
 
-func apDFS(g graph.Undirected, u, parent int64, visited map[int64]bool, disc, low map[int64]int, isAP map[int64]bool, timer *int) {
-	visited[u] = true
-	disc[u] = *timer
-	low[u] = *timer
-	*timer++
-	children := 0
+// apFrame is a stack frame for iterative articulation-point DFS.
+type apFrame struct {
+	u         int64
+	parent    int64
+	neighbors []int64
+	idx       int
+	children  int
+}
 
-	neighbors := g.From(u)
-	for neighbors.Next() {
-		v := neighbors.Node().ID()
-		if !visited[v] {
-			children++
-			apDFS(g, v, u, visited, disc, low, isAP, timer)
-			if low[v] < low[u] {
-				low[u] = low[v]
+func apDFS(g graph.Undirected, root, parent int64, visited map[int64]bool, disc, low map[int64]int, isAP map[int64]bool, timer *int) {
+	// Iterative DFS using explicit stack to avoid stack overflow.
+	callStack := []apFrame{{u: root, parent: parent, neighbors: collectNeighborIDs(g, root)}}
+	visited[root] = true
+	disc[root] = *timer
+	low[root] = *timer
+	*timer++
+
+	for len(callStack) > 0 {
+		top := &callStack[len(callStack)-1]
+
+		if top.idx < len(top.neighbors) {
+			v := top.neighbors[top.idx]
+			top.idx++
+
+			if !visited[v] {
+				top.children++
+
+				visited[v] = true
+				disc[v] = *timer
+				low[v] = *timer
+				*timer++
+
+				callStack = append(callStack, apFrame{
+					u:         v,
+					parent:    top.u,
+					neighbors: collectNeighborIDs(g, v),
+				})
+			} else if v != top.parent {
+				if disc[v] < low[top.u] {
+					low[top.u] = disc[v]
+				}
 			}
-			if parent == -1 && children > 1 {
-				isAP[u] = true
-			}
-			if parent != -1 && low[v] >= disc[u] {
-				isAP[u] = true
-			}
-		} else if v != parent {
-			if disc[v] < low[u] {
-				low[u] = disc[v]
+		} else {
+			// Done with this node; pop and update parent.
+			finished := *top
+			callStack = callStack[:len(callStack)-1]
+
+			if len(callStack) > 0 {
+				parentFrame := &callStack[len(callStack)-1]
+				if low[finished.u] < low[parentFrame.u] {
+					low[parentFrame.u] = low[finished.u]
+				}
+				if parentFrame.parent == -1 && parentFrame.children > 1 {
+					isAP[parentFrame.u] = true
+				}
+				if parentFrame.parent != -1 && low[finished.u] >= disc[parentFrame.u] {
+					isAP[parentFrame.u] = true
+				}
 			}
 		}
 	}

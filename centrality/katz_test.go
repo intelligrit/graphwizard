@@ -41,8 +41,8 @@ func TestKatz_Chain(t *testing.T) {
 func TestKatz_EmptyGraph(t *testing.T) {
 	g := simple.NewDirectedGraph()
 	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
-	if scores != nil {
-		t.Errorf("expected nil for empty graph, got %v", scores)
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for empty graph, got %v", scores)
 	}
 }
 

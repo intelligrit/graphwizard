@@ -27,7 +27,7 @@ func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, ma
 	}
 	n := len(ids)
 	if n == 0 {
-		return nil
+		return make(map[int64]float64)
 	}
 
 	idx := make(map[int64]int, n)
@@ -37,7 +37,7 @@ func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, ma
 
 	seedIdx, ok := idx[seed]
 	if !ok {
-		return nil
+		return make(map[int64]float64)
 	}
 
 	// Build out-degree and adjacency.
@@ -108,7 +108,7 @@ func PersonalizedPageRankUndirected(g graph.Undirected, seed int64, damping, tol
 	}
 	n := len(ids)
 	if n == 0 {
-		return nil
+		return make(map[int64]float64)
 	}
 
 	idx := make(map[int64]int, n)
@@ -118,7 +118,7 @@ func PersonalizedPageRankUndirected(g graph.Undirected, seed int64, damping, tol
 
 	seedIdx, ok := idx[seed]
 	if !ok {
-		return nil
+		return make(map[int64]float64)
 	}
 
 	adj := make([][]int, n)

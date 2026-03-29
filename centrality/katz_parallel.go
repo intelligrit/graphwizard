@@ -4,26 +4,18 @@ package centrality
 
 import (
 	"math"
+	"runtime"
+	"sync"
 
 	"gonum.org/v1/gonum/graph"
 )
 
-// Katz returns the Katz centrality for each node in a directed graph, keyed
-// by node ID.
+// KatzParallel returns the Katz centrality for each node in a directed graph,
+// with the per-node score computation within each power iteration parallelized
+// across available CPU cores.
 //
-// Katz centrality measures influence by summing all paths from every node,
-// with longer paths attenuated by alpha^k. The parameter alpha must be less
-// than 1/lambda_max (the largest eigenvalue of the adjacency matrix) for
-// convergence; typical values are 0.01–0.1. Beta is the base score given to
-// every node (usually 1.0).
-//
-// The algorithm uses power iteration with the given tolerance and maximum
-// iterations as stopping criteria.
-//
-// Reference: L. Katz, "A New Status Index Derived from Sociometric Analysis",
-// Psychometrika, 1953.
-func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
-	// Collect node IDs.
+// Parameters and semantics are identical to Katz.
+func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -34,13 +26,11 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 		return make(map[int64]float64)
 	}
 
-	// Index mapping for fast lookup.
 	idx := make(map[int64]int, n)
 	for i, id := range ids {
 		idx[id] = i
 	}
 
-	// Build predecessor lists (who points to each node).
 	preds := make([][]int, n)
 	for i := range preds {
 		preds[i] = []int{}
@@ -55,23 +45,33 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 		}
 	}
 
-	// Power iteration: x_new[i] = alpha * sum(x_old[j] for j in predecessors(i)) + beta
+	workers := runtime.GOMAXPROCS(0)
 	x := make([]float64, n)
-	for i := range x {
-		x[i] = 0
-	}
 
 	for iter := 0; iter < maxIter; iter++ {
 		xNew := make([]float64, n)
-		for i := 0; i < n; i++ {
-			sum := 0.0
-			for _, j := range preds[i] {
-				sum += x[j]
-			}
-			xNew[i] = alpha*sum + beta
-		}
 
-		// Check convergence.
+		var wg sync.WaitGroup
+		chunkSize := (n + workers - 1) / workers
+		for start := 0; start < n; start += chunkSize {
+			end := start + chunkSize
+			if end > n {
+				end = n
+			}
+			wg.Add(1)
+			go func(lo, hi int) {
+				defer wg.Done()
+				for i := lo; i < hi; i++ {
+					sum := 0.0
+					for _, j := range preds[i] {
+						sum += x[j]
+					}
+					xNew[i] = alpha*sum + beta
+				}
+			}(start, end)
+		}
+		wg.Wait()
+
 		diff := 0.0
 		for i := 0; i < n; i++ {
 			diff += math.Abs(xNew[i] - x[i])
@@ -89,9 +89,9 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 	return result
 }
 
-// KatzUndirected returns the Katz centrality for each node in an undirected
-// graph by treating each undirected edge as two directed edges.
-func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+// KatzUndirectedParallel returns the Katz centrality for each node in an
+// undirected graph, with power iteration parallelized.
+func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -121,17 +121,32 @@ func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) m
 		}
 	}
 
+	workers := runtime.GOMAXPROCS(0)
 	x := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
 		xNew := make([]float64, n)
-		for i := 0; i < n; i++ {
-			sum := 0.0
-			for _, j := range adj[i] {
-				sum += x[j]
+
+		var wg sync.WaitGroup
+		chunkSize := (n + workers - 1) / workers
+		for start := 0; start < n; start += chunkSize {
+			end := start + chunkSize
+			if end > n {
+				end = n
 			}
-			xNew[i] = alpha*sum + beta
+			wg.Add(1)
+			go func(lo, hi int) {
+				defer wg.Done()
+				for i := lo; i < hi; i++ {
+					sum := 0.0
+					for _, j := range adj[i] {
+						sum += x[j]
+					}
+					xNew[i] = alpha*sum + beta
+				}
+			}(start, end)
 		}
+		wg.Wait()
 
 		diff := 0.0
 		for i := 0; i < n; i++ {

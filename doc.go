@@ -7,6 +7,8 @@
 //
 // Users import only graphwizard packages and get access to the full spectrum
 // of graph algorithms — centrality, community detection, connectivity,
-// matching, shortest paths, structural analysis, and traversal — without
-// needing to learn gonum's iterator patterns or deal with multiple imports.
+// matching, shortest paths, structural analysis, traversal, anomaly detection,
+// graph diffing, subgraph extraction, streaming/incremental updates, and SQL
+// database loading — without needing to learn gonum's iterator patterns or
+// deal with multiple imports.
 package graphwizard

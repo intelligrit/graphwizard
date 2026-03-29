@@ -79,6 +79,7 @@ func PredictLinks(g graph.Undirected, k int, scorer func(graph.Undirected, int64
 	for nodes.Next() {
 		ids = append(ids, nodes.Node().ID())
 	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 
 	var candidates []PredictedLink
 	for i := 0; i < len(ids); i++ {

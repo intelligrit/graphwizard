@@ -151,7 +151,7 @@ func TestOutDegree_SingleNode(t *testing.T) {
 func TestKatzUndirected_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	scores := KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
-	if scores != nil {
-		t.Errorf("expected nil for empty graph, got %v", scores)
+	if len(scores) != 0 {
+		t.Errorf("expected empty map for empty graph, got %v", scores)
 	}
 }
