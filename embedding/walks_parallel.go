@@ -64,11 +64,15 @@ func Node2VecWalksParallel(g graph.Undirected, params WalkParams, seed int64) []
 
 	workers := runtime.GOMAXPROCS(0)
 	var wg sync.WaitGroup
-	ch := make(chan walkTask, len(tasks))
-	for _, t := range tasks {
-		ch <- t
-	}
-	close(ch)
+	ch := make(chan walkTask, workers*4)
+
+	// Feed tasks from a separate goroutine to avoid buffering all at once.
+	go func() {
+		for _, t := range tasks {
+			ch <- t
+		}
+		close(ch)
+	}()
 
 	for w := 0; w < workers; w++ {
 		wg.Add(1)

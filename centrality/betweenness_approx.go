@@ -105,19 +105,35 @@ func ApproximateBetweenness(g graph.Graph, k int, rng *rand.Rand) map[int64]floa
 // brandesSingleSource computes dependency scores from a single source using
 // BFS-based Brandes algorithm and accumulates into the local map.
 func brandesSingleSource(g graph.Graph, source int64, allIDs []int64, accum map[int64]float64) {
-	// BFS from source, tracking predecessors and shortest path counts.
+	// Dijkstra-based Brandes: uses a priority queue to handle weighted edges
+	// correctly, processing nodes in non-decreasing distance order.
 	dist := make(map[int64]float64)
-	sigma := make(map[int64]float64) // number of shortest paths
-	pred := make(map[int64][]int64)  // predecessors on shortest paths
+	sigma := make(map[int64]float64)
+	pred := make(map[int64][]int64)
 	dist[source] = 0
 	sigma[source] = 1
 
-	var stack []int64 // nodes in order of non-decreasing distance
-	queue := []int64{source}
+	var stack []int64
+	visited := make(map[int64]bool)
 
-	for len(queue) > 0 {
-		v := queue[0]
-		queue = queue[1:]
+	// Simple priority queue via linear scan (sufficient for sampled sources).
+	pending := map[int64]bool{source: true}
+
+	for len(pending) > 0 {
+		// Extract minimum distance node.
+		v := int64(-1)
+		vDist := math.Inf(1)
+		for id := range pending {
+			if dist[id] < vDist {
+				vDist = dist[id]
+				v = id
+			}
+		}
+		delete(pending, v)
+		if visited[v] {
+			continue
+		}
+		visited[v] = true
 		stack = append(stack, v)
 
 		neighbors := g.From(v)
@@ -135,10 +151,15 @@ func brandesSingleSource(g graph.Graph, source int64, allIDs []int64, accum map[
 				dist[w] = newDist
 				sigma[w] = sigma[v]
 				pred[w] = []int64{v}
-				queue = append(queue, w)
+				pending[w] = true
 			} else if math.Abs(newDist-dw) < 1e-10 {
 				sigma[w] += sigma[v]
 				pred[w] = append(pred[w], v)
+			} else if newDist < dw {
+				dist[w] = newDist
+				sigma[w] = sigma[v]
+				pred[w] = []int64{v}
+				pending[w] = true
 			}
 		}
 	}

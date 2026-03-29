@@ -63,9 +63,14 @@ func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, ma
 		// Teleport component: restart at seed.
 		newScore[seedIdx] = 1.0 - damping
 
-		// Diffusion component.
+		// Diffusion component. Dangling node mass is redirected to the seed.
+		danglingMass := 0.0
 		for i := 0; i < n; i++ {
-			if outDeg[i] == 0 || score[i] == 0 {
+			if score[i] == 0 {
+				continue
+			}
+			if outDeg[i] == 0 {
+				danglingMass += score[i]
 				continue
 			}
 			share := damping * score[i] / float64(outDeg[i])
@@ -73,6 +78,7 @@ func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, ma
 				newScore[j] += share
 			}
 		}
+		newScore[seedIdx] += damping * danglingMass
 
 		// Check convergence.
 		diff := 0.0
@@ -135,8 +141,13 @@ func PersonalizedPageRankUndirected(g graph.Undirected, seed int64, damping, tol
 		newScore := make([]float64, n)
 		newScore[seedIdx] = 1.0 - damping
 
+		danglingMass := 0.0
 		for i := 0; i < n; i++ {
-			if deg[i] == 0 || score[i] == 0 {
+			if score[i] == 0 {
+				continue
+			}
+			if deg[i] == 0 {
+				danglingMass += score[i]
 				continue
 			}
 			share := damping * score[i] / float64(deg[i])
@@ -144,6 +155,7 @@ func PersonalizedPageRankUndirected(g graph.Undirected, seed int64, damping, tol
 				newScore[j] += share
 			}
 		}
+		newScore[seedIdx] += damping * danglingMass
 
 		diff := 0.0
 		for i := 0; i < n; i++ {

@@ -4,6 +4,7 @@ package similarity
 
 import (
 	"runtime"
+	"sort"
 	"sync"
 
 	"gonum.org/v1/gonum/graph"
@@ -12,8 +13,11 @@ import (
 // JaccardAllParallel is a concurrent version of JaccardAll that distributes
 // pair computation across available CPU cores.
 //
-// For a graph with V nodes, this computes V*(V-1)/2 pairs. On an 11-core
-// machine, expect ~8-10x speedup over the sequential version.
+// WARNING: This computes V*(V-1)/2 pairs and is only practical for graphs
+// with fewer than ~50K nodes. For larger graphs, use a sparse approach that
+// only computes similarity for nodes sharing at least one neighbor.
+//
+// The graph implementation must be safe for concurrent reads.
 func JaccardAllParallel(g graph.Undirected, threshold float64) []NodePairScore {
 	nodes := g.Nodes()
 	var ids []int64
@@ -28,54 +32,51 @@ func JaccardAllParallel(g graph.Undirected, threshold float64) []NodePairScore {
 		nsets[id] = neighborSet(g, id)
 	}
 
-	// Generate pair tasks.
-	type pair struct{ i, j int }
-	pairs := make([]pair, 0, n*(n-1)/2)
-	for i := 0; i < n; i++ {
-		for j := i + 1; j < n; j++ {
-			pairs = append(pairs, pair{i, j})
-		}
-	}
-
 	workers := runtime.GOMAXPROCS(0)
 	var mu sync.Mutex
 	var results []NodePairScore
 
+	// Range-based work distribution: each worker gets a contiguous row range.
 	var wg sync.WaitGroup
-	ch := make(chan pair, len(pairs))
-	for _, p := range pairs {
-		ch <- p
-	}
-	close(ch)
+	rowCh := make(chan int, workers*4)
+
+	go func() {
+		for i := 0; i < n; i++ {
+			rowCh <- i
+		}
+		close(rowCh)
+	}()
 
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			var local []NodePairScore
-			for p := range ch {
-				nu := nsets[ids[p.i]]
-				nv := nsets[ids[p.j]]
-				if len(nu) == 0 && len(nv) == 0 {
-					continue
-				}
-				intersection := 0
-				for id := range nu {
-					if _, ok := nv[id]; ok {
-						intersection++
+			for i := range rowCh {
+				nu := nsets[ids[i]]
+				for j := i + 1; j < n; j++ {
+					nv := nsets[ids[j]]
+					if len(nu) == 0 && len(nv) == 0 {
+						continue
 					}
-				}
-				union := len(nu) + len(nv) - intersection
-				if union == 0 {
-					continue
-				}
-				score := float64(intersection) / float64(union)
-				if score >= threshold {
-					local = append(local, NodePairScore{
-						A:     g.Node(ids[p.i]),
-						B:     g.Node(ids[p.j]),
-						Score: score,
-					})
+					intersection := 0
+					for id := range nu {
+						if _, ok := nv[id]; ok {
+							intersection++
+						}
+					}
+					union := len(nu) + len(nv) - intersection
+					if union == 0 {
+						continue
+					}
+					score := float64(intersection) / float64(union)
+					if score >= threshold {
+						local = append(local, NodePairScore{
+							A:     g.Node(ids[i]),
+							B:     g.Node(ids[j]),
+							Score: score,
+						})
+					}
 				}
 			}
 			mu.Lock()
@@ -89,6 +90,11 @@ func JaccardAllParallel(g graph.Undirected, threshold float64) []NodePairScore {
 }
 
 // PredictLinksParallel is a concurrent version of PredictLinks.
+//
+// WARNING: This evaluates all V*(V-1)/2 non-adjacent pairs. Only practical
+// for graphs with fewer than ~50K nodes.
+//
+// The graph implementation must be safe for concurrent reads.
 func PredictLinksParallel(g graph.Undirected, k int, scorer func(graph.Undirected, int64, int64) float64) []PredictedLink {
 	nodes := g.Nodes()
 	var ids []int64
@@ -97,36 +103,34 @@ func PredictLinksParallel(g graph.Undirected, k int, scorer func(graph.Undirecte
 	}
 	n := len(ids)
 
-	type pair struct{ i, j int }
-	var pairs []pair
-	for i := 0; i < n; i++ {
-		for j := i + 1; j < n; j++ {
-			if !g.HasEdgeBetween(ids[i], ids[j]) {
-				pairs = append(pairs, pair{i, j})
-			}
-		}
-	}
-
 	workers := runtime.GOMAXPROCS(0)
 	var mu sync.Mutex
 	var results []PredictedLink
 
 	var wg sync.WaitGroup
-	ch := make(chan pair, len(pairs))
-	for _, p := range pairs {
-		ch <- p
-	}
-	close(ch)
+	rowCh := make(chan int, workers*4)
+
+	go func() {
+		for i := 0; i < n; i++ {
+			rowCh <- i
+		}
+		close(rowCh)
+	}()
 
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			var local []PredictedLink
-			for p := range ch {
-				score := scorer(g, ids[p.i], ids[p.j])
-				if score > 0 {
-					local = append(local, PredictedLink{A: ids[p.i], B: ids[p.j], Score: score})
+			for i := range rowCh {
+				for j := i + 1; j < n; j++ {
+					if g.HasEdgeBetween(ids[i], ids[j]) {
+						continue
+					}
+					score := scorer(g, ids[i], ids[j])
+					if score > 0 {
+						local = append(local, PredictedLink{A: ids[i], B: ids[j], Score: score})
+					}
 				}
 			}
 			mu.Lock()
@@ -136,20 +140,11 @@ func PredictLinksParallel(g graph.Undirected, k int, scorer func(graph.Undirecte
 	}
 	wg.Wait()
 
-	// Sort by score descending.
-	sortPredictions(results)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
 	if k > 0 && k < len(results) {
 		results = results[:k]
 	}
 	return results
-}
-
-func sortPredictions(preds []PredictedLink) {
-	for i := 1; i < len(preds); i++ {
-		j := i
-		for j > 0 && preds[j].Score > preds[j-1].Score {
-			preds[j], preds[j-1] = preds[j-1], preds[j]
-			j--
-		}
-	}
 }

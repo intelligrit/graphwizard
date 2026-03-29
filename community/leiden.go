@@ -125,6 +125,12 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 	moved := false
 	order := rng.Perm(n)
 
+	// Maintain sigmaTot incrementally: O(1) lookup instead of O(n) scan.
+	sigmaTot := make(map[int]float64)
+	for i := 0; i < n; i++ {
+		sigmaTot[comm[i]] += degree[i]
+	}
+
 	changed := true
 	for changed {
 		changed = false
@@ -139,8 +145,7 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 			bestDelta := 0.0
 
 			wOld := commWeights[oldComm]
-			// Total degree of nodes in old community (sum of full degrees).
-			oldSigmaTot := communityDegree(degree, comm, n, oldComm)
+			oldSigmaTot := sigmaTot[oldComm]
 
 			m := totalWeight
 			if m == 0 {
@@ -151,11 +156,8 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 				if c == oldComm {
 					continue
 				}
-				sigmaTot := communityDegree(degree, comm, n, c)
-				// Standard modularity gain:
-				// ΔQ = k_{i,in}/m - γ·k_i·Σ_tot/(2m²)
-				//    - [k_{i,old}/m - γ·k_i·(Σ_tot_old - k_i)/(2m²)]
-				delta := (wc-wOld)/m - resolution*degree[i]*(sigmaTot-(oldSigmaTot-degree[i]))/(2*m*m)
+				cSigmaTot := sigmaTot[c]
+				delta := (wc-wOld)/m - resolution*degree[i]*(cSigmaTot-(oldSigmaTot-degree[i]))/(2*m*m)
 				if delta > bestDelta {
 					bestDelta = delta
 					bestComm = c
@@ -163,6 +165,9 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 			}
 
 			if bestComm != oldComm {
+				// Update sigmaTot incrementally.
+				sigmaTot[oldComm] -= degree[i]
+				sigmaTot[bestComm] += degree[i]
 				comm[i] = bestComm
 				changed = true
 				moved = true
@@ -279,13 +284,3 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 	return newComm, newAdj, newDegree, newSelfLoops, newN, aggMap
 }
 
-// communityDegree returns the sum of (full) degrees for all nodes in community c.
-func communityDegree(degree []float64, comm []int, n, c int) float64 {
-	w := 0.0
-	for i := 0; i < n; i++ {
-		if comm[i] == c {
-			w += degree[i]
-		}
-	}
-	return w
-}
