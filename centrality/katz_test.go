@@ -1,0 +1,60 @@
+// Copyright (c) 2026 Intelligrit. MIT License. See LICENSE.
+
+package centrality
+
+import (
+	"math"
+	"testing"
+
+	"gonum.org/v1/gonum/graph/simple"
+)
+
+const epsilon = 1e-6
+
+func TestKatz_StarGraph(t *testing.T) {
+	// Directed star: 1->0, 2->0, 3->0. Node 0 should have highest Katz.
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
+
+	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	if scores[0] <= scores[1] {
+		t.Errorf("node 0 (hub) should have highest Katz; got 0=%f, 1=%f", scores[0], scores[1])
+	}
+}
+
+func TestKatz_Chain(t *testing.T) {
+	// Chain: 0->1->2->3. Node 3 accumulates all paths.
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
+
+	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	// Node 3 receives from 2, and transitively from 1 and 0.
+	if scores[3] <= scores[0] {
+		t.Errorf("node 3 should have highest Katz; got 3=%f, 0=%f", scores[3], scores[0])
+	}
+}
+
+func TestKatz_EmptyGraph(t *testing.T) {
+	g := simple.NewDirectedGraph()
+	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	if scores != nil {
+		t.Errorf("expected nil for empty graph, got %v", scores)
+	}
+}
+
+func TestKatzUndirected_Triangle(t *testing.T) {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	scores := KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	// All nodes symmetric, should have equal Katz.
+	if math.Abs(scores[0]-scores[1]) > epsilon || math.Abs(scores[1]-scores[2]) > epsilon {
+		t.Errorf("symmetric triangle should have equal Katz; got %v", scores)
+	}
+}
