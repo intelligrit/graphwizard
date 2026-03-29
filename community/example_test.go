@@ -79,6 +79,28 @@ func ExampleSpectralClustering() {
 	// Output: clusters: 2
 }
 
+func ExampleLeidenParallel() {
+	g := simple.NewUndirectedGraph()
+	// Cluster A: triangle 0-1-2.
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	// Cluster B: triangle 3-4-5.
+	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(4)))
+	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
+	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(3)))
+	// Bridge.
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
+
+	rng := rand.New(rand.NewSource(42))
+	comms := community.LeidenParallel(g, 1.0, rng)
+	fmt.Printf("same cluster: %v\n", comms[0] == comms[1])
+	fmt.Printf("different clusters: %v\n", comms[0] != comms[3])
+	// Output:
+	// same cluster: true
+	// different clusters: true
+}
+
 func ExampleLouvainQ() {
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))

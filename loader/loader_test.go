@@ -3,17 +3,292 @@
 package loader
 
 import (
-	"database/sql"
 	"fmt"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
 )
 
-// mockRows implements just enough of *sql.Rows behavior for testing scanEdges
-// and scanWeightedEdges via the actual scan functions. Since we can't create
-// real sql.Rows without a driver, we test the ensure-node and graph-building
-// logic directly.
+// mockRows implements the RowScanner interface for testing without a real DB.
+type mockRows struct {
+	data    [][]interface{}
+	index   int
+	scanErr error
+	iterErr error
+}
+
+func newMockRows(data [][]interface{}) *mockRows {
+	return &mockRows{data: data, index: -1}
+}
+
+func (m *mockRows) Next() bool {
+	m.index++
+	return m.index < len(m.data)
+}
+
+func (m *mockRows) Scan(dest ...interface{}) error {
+	if m.scanErr != nil {
+		return m.scanErr
+	}
+	row := m.data[m.index]
+	for i, d := range dest {
+		switch ptr := d.(type) {
+		case *int64:
+			switch v := row[i].(type) {
+			case int64:
+				*ptr = v
+			case int:
+				*ptr = int64(v)
+			}
+		case *float64:
+			switch v := row[i].(type) {
+			case float64:
+				*ptr = v
+			case int:
+				*ptr = float64(v)
+			}
+		}
+	}
+	return nil
+}
+
+func (m *mockRows) Err() error {
+	return m.iterErr
+}
+
+func TestLoadDirectedFromRows(t *testing.T) {
+	rows := newMockRows([][]interface{}{
+		{int64(1), int64(2)},
+		{int64(2), int64(3)},
+		{int64(3), int64(1)},
+	})
+
+	g, err := loadDirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !g.HasEdgeFromTo(1, 2) {
+		t.Error("missing edge 1->2")
+	}
+	if !g.HasEdgeFromTo(2, 3) {
+		t.Error("missing edge 2->3")
+	}
+	if !g.HasEdgeFromTo(3, 1) {
+		t.Error("missing edge 3->1")
+	}
+	if g.HasEdgeFromTo(2, 1) {
+		t.Error("unexpected edge 2->1 in directed graph")
+	}
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 3 {
+		t.Errorf("expected 3 nodes, got %d", count)
+	}
+}
+
+func TestLoadDirectedFromRows_Empty(t *testing.T) {
+	rows := newMockRows(nil)
+
+	g, err := loadDirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("expected 0 nodes, got %d", count)
+	}
+}
+
+func TestLoadDirectedFromRows_ScanError(t *testing.T) {
+	rows := &mockRows{
+		data:    [][]interface{}{{int64(1), int64(2)}},
+		index:   -1,
+		scanErr: fmt.Errorf("scan failure"),
+	}
+
+	_, err := loadDirectedFromRows(rows)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadDirectedFromRows_IterError(t *testing.T) {
+	rows := &mockRows{
+		data:    nil,
+		index:   -1,
+		iterErr: fmt.Errorf("iteration failure"),
+	}
+
+	_, err := loadDirectedFromRows(rows)
+	if err == nil {
+		t.Fatal("expected error from rows.Err()")
+	}
+}
+
+func TestLoadUndirectedFromRows(t *testing.T) {
+	rows := newMockRows([][]interface{}{
+		{int64(1), int64(2)},
+		{int64(2), int64(3)},
+	})
+
+	g, err := loadUndirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !g.HasEdgeBetween(1, 2) {
+		t.Error("missing edge 1-2")
+	}
+	if !g.HasEdgeBetween(2, 3) {
+		t.Error("missing edge 2-3")
+	}
+	if !g.HasEdgeBetween(2, 1) {
+		t.Error("undirected edge 2-1 should exist")
+	}
+}
+
+func TestLoadUndirectedFromRows_Empty(t *testing.T) {
+	rows := newMockRows(nil)
+
+	g, err := loadUndirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("expected 0 nodes, got %d", count)
+	}
+}
+
+func TestLoadUndirectedFromRows_ScanError(t *testing.T) {
+	rows := &mockRows{
+		data:    [][]interface{}{{int64(1), int64(2)}},
+		index:   -1,
+		scanErr: fmt.Errorf("scan failure"),
+	}
+
+	_, err := loadUndirectedFromRows(rows)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadWeightedDirectedFromRows(t *testing.T) {
+	rows := newMockRows([][]interface{}{
+		{int64(1), int64(2), float64(1.5)},
+		{int64(2), int64(3), float64(2.5)},
+	})
+
+	g, err := loadWeightedDirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w, ok := g.Weight(1, 2)
+	if !ok || w != 1.5 {
+		t.Errorf("expected weight 1.5, got %v (ok=%v)", w, ok)
+	}
+	w, ok = g.Weight(2, 3)
+	if !ok || w != 2.5 {
+		t.Errorf("expected weight 2.5, got %v (ok=%v)", w, ok)
+	}
+}
+
+func TestLoadWeightedDirectedFromRows_Empty(t *testing.T) {
+	rows := newMockRows(nil)
+
+	g, err := loadWeightedDirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("expected 0 nodes, got %d", count)
+	}
+}
+
+func TestLoadWeightedDirectedFromRows_ScanError(t *testing.T) {
+	rows := &mockRows{
+		data:    [][]interface{}{{int64(1), int64(2), float64(1.0)}},
+		index:   -1,
+		scanErr: fmt.Errorf("scan failure"),
+	}
+
+	_, err := loadWeightedDirectedFromRows(rows)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoadWeightedUndirectedFromRows(t *testing.T) {
+	rows := newMockRows([][]interface{}{
+		{int64(10), int64(20), float64(3.14)},
+		{int64(20), int64(30), float64(2.71)},
+	})
+
+	g, err := loadWeightedUndirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	w, ok := g.Weight(10, 20)
+	if !ok || w != 3.14 {
+		t.Errorf("expected weight 3.14, got %v (ok=%v)", w, ok)
+	}
+	w, ok = g.Weight(20, 30)
+	if !ok || w != 2.71 {
+		t.Errorf("expected weight 2.71, got %v (ok=%v)", w, ok)
+	}
+	// Undirected: reverse direction should also work.
+	w, ok = g.Weight(20, 10)
+	if !ok || w != 3.14 {
+		t.Errorf("expected weight 3.14 for reverse, got %v (ok=%v)", w, ok)
+	}
+}
+
+func TestLoadWeightedUndirectedFromRows_Empty(t *testing.T) {
+	rows := newMockRows(nil)
+
+	g, err := loadWeightedUndirectedFromRows(rows)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("expected 0 nodes, got %d", count)
+	}
+}
+
+func TestLoadWeightedUndirectedFromRows_ScanError(t *testing.T) {
+	rows := &mockRows{
+		data:    [][]interface{}{{int64(1), int64(2), float64(1.0)}},
+		index:   -1,
+		scanErr: fmt.Errorf("scan failure"),
+	}
+
+	_, err := loadWeightedUndirectedFromRows(rows)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
 
 func TestEnsureNodeDirected(t *testing.T) {
 	g := simple.NewDirectedGraph()
@@ -76,99 +351,3 @@ func TestEnsureNodeWeightedUndirected(t *testing.T) {
 		t.Error("expected node 7")
 	}
 }
-
-// TestBuildDirectedGraph tests the full graph-building pipeline by directly
-// constructing edges as the scan functions would.
-func TestBuildDirectedGraph(t *testing.T) {
-	g := simple.NewDirectedGraph()
-	seen := make(map[int64]bool)
-
-	edges := [][2]int64{{1, 2}, {2, 3}, {3, 1}}
-	for _, e := range edges {
-		ensureNodeDirected(g, e[0], seen)
-		ensureNodeDirected(g, e[1], seen)
-		g.SetEdge(g.NewEdge(simple.Node(e[0]), simple.Node(e[1])))
-	}
-
-	if !g.HasEdgeFromTo(1, 2) {
-		t.Error("missing edge 1->2")
-	}
-	if !g.HasEdgeFromTo(2, 3) {
-		t.Error("missing edge 2->3")
-	}
-	if !g.HasEdgeFromTo(3, 1) {
-		t.Error("missing edge 3->1")
-	}
-	if g.HasEdgeFromTo(2, 1) {
-		t.Error("unexpected edge 2->1 in directed graph")
-	}
-}
-
-// TestBuildUndirectedGraph tests undirected graph building.
-func TestBuildUndirectedGraph(t *testing.T) {
-	g := simple.NewUndirectedGraph()
-	seen := make(map[int64]bool)
-
-	edges := [][2]int64{{1, 2}, {2, 3}}
-	for _, e := range edges {
-		ensureNodeUndirected(g, e[0], seen)
-		ensureNodeUndirected(g, e[1], seen)
-		g.SetEdge(g.NewEdge(simple.Node(e[0]), simple.Node(e[1])))
-	}
-
-	if !g.HasEdgeBetween(1, 2) {
-		t.Error("missing edge 1-2")
-	}
-	if !g.HasEdgeBetween(2, 3) {
-		t.Error("missing edge 2-3")
-	}
-	if !g.HasEdgeBetween(2, 1) {
-		t.Error("undirected edge 2-1 should exist")
-	}
-}
-
-// TestBuildWeightedGraph tests weighted graph building.
-func TestBuildWeightedGraph(t *testing.T) {
-	g := simple.NewWeightedDirectedGraph(0, 0)
-	seen := make(map[int64]bool)
-
-	type wedge struct {
-		from, to int64
-		w        float64
-	}
-	edges := []wedge{{1, 2, 1.5}, {2, 3, 2.5}}
-	for _, e := range edges {
-		ensureNodeWeightedDirected(g, e.from, seen)
-		ensureNodeWeightedDirected(g, e.to, seen)
-		g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(e.from), simple.Node(e.to), e.w))
-	}
-
-	w, ok := g.Weight(1, 2)
-	if !ok || w != 1.5 {
-		t.Errorf("expected weight 1.5, got %v (ok=%v)", w, ok)
-	}
-	w, ok = g.Weight(2, 3)
-	if !ok || w != 2.5 {
-		t.Errorf("expected weight 2.5, got %v (ok=%v)", w, ok)
-	}
-}
-
-// TestScanEdges_EmptyDirected verifies scanning zero edges produces empty graph.
-func TestScanEdges_EmptyDirected(t *testing.T) {
-	g := simple.NewDirectedGraph()
-	// With no rows, the graph should be empty. We test by calling with a
-	// nil *sql.Rows which would panic on rows.Next() -- so we just verify
-	// the graph starts empty.
-	count := 0
-	nodes := g.Nodes()
-	for nodes.Next() {
-		count++
-	}
-	if count != 0 {
-		t.Errorf("new graph should have 0 nodes, got %d", count)
-	}
-}
-
-// Ensure unused import.
-var _ = sql.ErrNoRows
-var _ = fmt.Sprint

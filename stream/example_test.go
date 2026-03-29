@@ -8,6 +8,18 @@ import (
 	"github.com/intelligrit/graphwizard/stream"
 )
 
+func ExampleNew() {
+	sg := stream.New()
+	sg.AddNode(1)
+	sg.AddNode(2)
+	sg.AddEdge(1, 2, 1.0)
+
+	g := sg.Graph()
+	w, _ := g.Weight(1, 2)
+	fmt.Printf("weight: %.0f\n", w)
+	// Output: weight: 1
+}
+
 func ExampleStreamGraph() {
 	sg := stream.New()
 	sg.AddNode(1)

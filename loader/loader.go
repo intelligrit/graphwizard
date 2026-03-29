@@ -9,6 +9,14 @@ import (
 	"gonum.org/v1/gonum/graph/simple"
 )
 
+// RowScanner is an interface for iterating over query result rows.
+// *sql.Rows satisfies this interface.
+type RowScanner interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+	Err() error
+}
+
 // LoadDirected executes query against db and builds a directed graph.
 // The query must return rows of (from_id INT, to_id INT).
 func LoadDirected(db *sql.DB, query string) (*simple.DirectedGraph, error) {
@@ -18,6 +26,11 @@ func LoadDirected(db *sql.DB, query string) (*simple.DirectedGraph, error) {
 	}
 	defer rows.Close()
 
+	return loadDirectedFromRows(rows)
+}
+
+// loadDirectedFromRows builds a directed graph from a RowScanner.
+func loadDirectedFromRows(rows RowScanner) (*simple.DirectedGraph, error) {
 	g := simple.NewDirectedGraph()
 	if err := scanEdges(rows, g, false); err != nil {
 		return nil, err
@@ -35,6 +48,11 @@ func LoadWeightedDirected(db *sql.DB, query string) (*simple.WeightedDirectedGra
 	}
 	defer rows.Close()
 
+	return loadWeightedDirectedFromRows(rows)
+}
+
+// loadWeightedDirectedFromRows builds a weighted directed graph from a RowScanner.
+func loadWeightedDirectedFromRows(rows RowScanner) (*simple.WeightedDirectedGraph, error) {
 	g := simple.NewWeightedDirectedGraph(0, 0)
 	if err := scanWeightedEdges(rows, g); err != nil {
 		return nil, err
@@ -51,6 +69,11 @@ func LoadUndirected(db *sql.DB, query string) (*simple.UndirectedGraph, error) {
 	}
 	defer rows.Close()
 
+	return loadUndirectedFromRows(rows)
+}
+
+// loadUndirectedFromRows builds an undirected graph from a RowScanner.
+func loadUndirectedFromRows(rows RowScanner) (*simple.UndirectedGraph, error) {
 	g := simple.NewUndirectedGraph()
 	if err := scanEdges(rows, g, true); err != nil {
 		return nil, err
@@ -68,6 +91,11 @@ func LoadWeightedUndirected(db *sql.DB, query string) (*simple.WeightedUndirecte
 	}
 	defer rows.Close()
 
+	return loadWeightedUndirectedFromRows(rows)
+}
+
+// loadWeightedUndirectedFromRows builds a weighted undirected graph from a RowScanner.
+func loadWeightedUndirectedFromRows(rows RowScanner) (*simple.WeightedUndirectedGraph, error) {
 	g := simple.NewWeightedUndirectedGraph(0, 0)
 	if err := scanWeightedEdges(rows, g); err != nil {
 		return nil, err
@@ -75,7 +103,7 @@ func LoadWeightedUndirected(db *sql.DB, query string) (*simple.WeightedUndirecte
 	return g, nil
 }
 
-func scanEdges(rows *sql.Rows, g interface{}, undirected bool) error {
+func scanEdges(rows RowScanner, g interface{}, undirected bool) error {
 	seen := make(map[int64]bool)
 	for rows.Next() {
 		var from, to int64
@@ -96,7 +124,7 @@ func scanEdges(rows *sql.Rows, g interface{}, undirected bool) error {
 	return rows.Err()
 }
 
-func scanWeightedEdges(rows *sql.Rows, g interface{}) error {
+func scanWeightedEdges(rows RowScanner, g interface{}) error {
 	seen := make(map[int64]bool)
 	for rows.Next() {
 		var from, to int64

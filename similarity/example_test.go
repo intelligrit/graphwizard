@@ -120,5 +120,22 @@ func ExampleJaccardAllParallel() {
 	// Output: pairs above threshold: 3
 }
 
+func ExamplePredictLinksParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scorer := func(g graph.Undirected, u, v int64) float64 {
+		return float64(similarity.CommonNeighbors(g, u, v))
+	}
+	preds := similarity.PredictLinksParallel(g, 1, scorer)
+	a, b := preds[0].A, preds[0].B
+	if a > b {
+		a, b = b, a
+	}
+	fmt.Printf("predicted: %d-%d\n", a, b)
+	// Output: predicted: 0-2
+}
+
 // Ensure unused imports.
 var _ = math.Inf

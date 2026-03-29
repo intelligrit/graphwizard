@@ -108,6 +108,55 @@ func ExampleDegeneracyOrdering() {
 	// Output: nodes: 3, layers: 3
 }
 
+func ExampleBridgesParallel() {
+	g := simple.NewUndirectedGraph()
+	// Component 1: triangle with a bridge.
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3))) // bridge
+	// Component 2: disconnected pair.
+	g.SetEdge(g.NewEdge(simple.Node(10), simple.Node(11))) // bridge
+
+	bridges := connectivity.BridgesParallel(g)
+	fmt.Printf("bridges: %d\n", len(bridges))
+	// Output: bridges: 2
+}
+
+func ExampleDirectedCycles() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	cycles := connectivity.DirectedCycles(g)
+	fmt.Printf("cycles: %d\n", len(cycles))
+	// Output: cycles: 1
+}
+
+func ExampleUndirectedCycles() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	cycles := connectivity.UndirectedCycles(g)
+	fmt.Printf("cycle basis size: %d\n", len(cycles))
+	// Output: cycle basis size: 1
+}
+
+func ExampleNewUnionFind() {
+	uf := connectivity.NewUnionFind()
+	uf.Union(1, 2)
+	uf.Union(3, 4)
+
+	fmt.Printf("1-2 connected: %v\n", uf.Connected(1, 2))
+	fmt.Printf("1-3 connected: %v\n", uf.Connected(1, 3))
+	// Output:
+	// 1-2 connected: true
+	// 1-3 connected: false
+}
+
 func ExampleBiconnectedComponents() {
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))

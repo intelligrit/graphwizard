@@ -193,5 +193,90 @@ func ExampleDiameterParallel() {
 	// Output: diameter=2
 }
 
+func ExampleBetweennessWeighted() {
+	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(2), 10))
+
+	allPaths := path.DijkstraAllPaths(g)
+	scores := centrality.BetweennessWeighted(g, allPaths)
+	fmt.Printf("center=%.1f endpoint=%.1f\n", scores[1], scores[0])
+	// Output: center=2.0 endpoint=0.0
+}
+
+func ExampleEdgeBetweenness() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scores := centrality.EdgeBetweenness(g)
+	fmt.Printf("pairs: %d\n", len(scores))
+	// Output: pairs: 2
+}
+
+func ExampleEdgeBetweennessWeighted() {
+	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 1))
+	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
+
+	allPaths := path.DijkstraAllPaths(g)
+	scores := centrality.EdgeBetweennessWeighted(g, allPaths)
+	fmt.Printf("pairs: %d\n", len(scores))
+	// Output: pairs: 2
+}
+
+func ExampleHarmonic() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	allPaths := path.DijkstraAllPaths(g)
+	scores := centrality.Harmonic(g, allPaths)
+	fmt.Printf("center=%.4f endpoint=%.4f\n", scores[1], scores[0])
+	// Output: center=2.0000 endpoint=1.5000
+}
+
+func ExampleKatzParallel() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scores := centrality.KatzParallel(g, 0.1, 1.0, 1e-8, 100)
+	fmt.Printf("node2 > node0: %v\n", scores[2] > scores[0])
+	// Output: node2 > node0: true
+}
+
+func ExampleKatzUndirected() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scores := centrality.KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	fmt.Printf("center highest: %v\n", scores[1] >= scores[0])
+	// Output: center highest: true
+}
+
+func ExampleKatzUndirectedParallel() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	scores := centrality.KatzUndirectedParallel(g, 0.1, 1.0, 1e-8, 100)
+	fmt.Printf("center highest: %v\n", scores[1] >= scores[0])
+	// Output: center highest: true
+}
+
+func ExamplePageRankSparse() {
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+
+	scores := centrality.PageRankSparse(g, 0.85, 1e-6)
+	fmt.Printf("%.4f\n", scores[0])
+	// Output: 0.3333
+}
+
 // Ensure unused imports are valid.
 var _ = math.Inf
