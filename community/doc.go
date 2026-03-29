@@ -8,6 +8,7 @@
 //     well-connected communities via a refinement phase that improves on Louvain.
 //   - [LabelPropagation] — fast near-linear community detection via iterative
 //     label adoption (Raghavan et al. 2007).
+//   - [SpectralClustering] — Laplacian eigenvector-based clustering (Ng et al. 2001).
 //
 // # Wrapped from gonum/graph/community
 //

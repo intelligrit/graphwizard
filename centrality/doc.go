@@ -13,6 +13,7 @@
 //   - [PersonalizedPageRank] / [PersonalizedPageRankUndirected] — PPR relative to a seed node.
 //   - [Eccentricity] — max shortest-path distance from each node.
 //   - [Diameter] / [Radius] — graph diameter and radius.
+//   - [InfluenceMaximization] — CELF greedy seed selection for max cascade spread.
 //
 // # Wrapped from gonum/graph/network
 //

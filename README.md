@@ -59,15 +59,15 @@ go get github.com/intelligrit/graphwizard
 
 | Package | Algorithms | Source |
 |---|---|---|
-| **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius | Custom + gonum |
-| **community** | Leiden, Louvain, Label Propagation | Custom + gonum |
-| **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy | Custom + gonum |
+| **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
+| **community** | Leiden, Louvain, Label Propagation, Spectral Clustering | Custom + gonum |
+| **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy, Topological Sort | Custom + gonum |
 | **embedding** | Node2Vec Walks, DeepWalk Walks, SVD Embedding | Custom |
-| **flow** | Max Flow (Dinic) | gonum |
+| **flow** | Max Flow (Dinic), Min Cut | Custom + gonum |
 | **matching** | Hopcroft-Karp Bipartite Matching | Custom |
 | **paths** | Dijkstra, Bellman-Ford, Floyd-Warshall, A*, Yen's K Shortest | Custom + gonum |
-| **similarity** | Jaccard, Overlap | Custom |
-| **structure** | Clustering Coefficient, Triangle Count, Cliques, Coloring, Set Cover, Kruskal MST, Prim MST, TSP | Custom + gonum |
+| **similarity** | Jaccard, Overlap, Cosine, SimRank, Common Neighbors, Adamic-Adar, Preferential Attachment, Link Prediction | Custom |
+| **structure** | Clustering Coefficient, Triangle Count, Cliques, Coloring, Set Cover, Kruskal MST, Prim MST, TSP, Bipartite Projection | Custom + gonum |
 | **traverse** | BFS, DFS, BFS Path | gonum |
 
 ## Quick Start
@@ -145,13 +145,19 @@ func main() {
 | Clustering Coefficient | Watts, Strogatz. "Collective dynamics of 'small-world' networks." *Nature*, 1998 |
 | Set Cover | Chvatal. "A Greedy Heuristic for the Set-Covering Problem." *Mathematics of Operations Research*, 1979 |
 | TSP 2-opt | Croes. "A Method for Solving Traveling-Salesman Problems." *Operations Research*, 1958 |
+| Adamic-Adar | Adamic, Adar. "Friends and neighbors on the Web." *Social Networks*, 2003 |
+| SimRank | Jeh, Widom. "SimRank: A Measure of Structural-Context Similarity." *KDD*, 2002 |
+| Influence Maximization | Kempe, Kleinberg, Tardos. "Maximizing the Spread of Influence." *KDD*, 2003 |
+| CELF Optimization | Leskovec et al. "Cost-effective Outbreak Detection in Networks." *KDD*, 2007 |
+| Spectral Clustering | Ng, Jordan, Weiss. "On Spectral Clustering." *NIPS*, 2001 |
+| Min Cut | Ford, Fulkerson. "Maximal Flow Through a Network." *Canadian J. Math*, 1956 |
 
 ## Stats
 
-- 44 source files, 45 test files
-- 6,400+ lines of Go
-- 197 test and example functions
-- 97.3% statement coverage (5 packages at 100%)
+- 50+ source files, 50+ test files
+- 7,500+ lines of Go
+- 220+ test and example functions
+- 97%+ statement coverage (5 packages at 100%)
 - Zero external dependencies beyond gonum
 
 ## License
