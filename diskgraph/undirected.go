@@ -20,6 +20,14 @@ type Undirected struct {
 	edges *bolt.Bucket
 	adj   *bolt.Bucket
 	n     int64
+
+	// adjCache, when non-nil, holds preloaded adjacency lists keyed by
+	// node ID. This accelerates From() and HasEdgeBetween() at the cost
+	// of holding the adjacency structure in memory. Enable via
+	// PreloadAdjacency().
+	adjCache map[int64][]int64
+	// adjSet mirrors adjCache as sets for O(1) HasEdgeBetween lookups.
+	adjSet map[int64]map[int64]struct{}
 }
 
 // OpenUndirected opens a bolt file previously created by UndirectedBuilder.
@@ -46,8 +54,33 @@ func OpenUndirected(path string) (*Undirected, error) {
 	}, nil
 }
 
+// PreloadAdjacency loads all adjacency lists into memory. This trades memory
+// for speed — HasEdgeBetween becomes an O(1) set lookup instead of a B-tree
+// traversal, which dramatically improves algorithms like ClusteringCoefficient
+// that call HasEdgeBetween in tight loops.
+//
+// For a graph with E edges, this uses roughly O(E * 16) bytes of memory.
+func (g *Undirected) PreloadAdjacency() {
+	g.adjCache = make(map[int64][]int64, g.n)
+	g.adjSet = make(map[int64]map[int64]struct{}, g.n)
+
+	g.adj.ForEach(func(k, v []byte) error {
+		id := bytesToInt64(k)
+		neighbors := decodeIDs(v)
+		g.adjCache[id] = neighbors
+		s := make(map[int64]struct{}, len(neighbors))
+		for _, nid := range neighbors {
+			s[nid] = struct{}{}
+		}
+		g.adjSet[id] = s
+		return nil
+	})
+}
+
 // Close releases the read transaction and bolt database.
 func (g *Undirected) Close() error {
+	g.adjCache = nil
+	g.adjSet = nil
 	g.tx.Rollback()
 	return g.db.Close()
 }
@@ -77,6 +110,13 @@ func (g *Undirected) allNodeIDs() []int64 {
 
 // From returns all nodes reachable from the node with the given ID.
 func (g *Undirected) From(id int64) graph.Nodes {
+	if g.adjCache != nil {
+		neighbors := g.adjCache[id]
+		if neighbors == nil {
+			return emptyNodes{}
+		}
+		return newSliceNodes(neighbors)
+	}
 	v := g.adj.Get(int64ToBytes(id))
 	neighbors := decodeIDs(v)
 	if neighbors == nil {
@@ -87,6 +127,14 @@ func (g *Undirected) From(id int64) graph.Nodes {
 
 // HasEdgeBetween returns whether an edge exists between xid and yid.
 func (g *Undirected) HasEdgeBetween(xid, yid int64) bool {
+	if g.adjSet != nil {
+		s := g.adjSet[xid]
+		if s == nil {
+			return false
+		}
+		_, ok := s[yid]
+		return ok
+	}
 	return g.edges.Get(edgeKey(xid, yid)) != nil
 }
 

@@ -579,6 +579,22 @@ func BenchmarkClusteringCoeff_Disk_1K(b *testing.B) {
 	}
 }
 
+func BenchmarkClusteringCoeff_DiskPreload_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bccp")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	g.PreloadAdjacency()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		structure.ClusteringCoefficient(g)
+	}
+}
+
 // --- Bridges ---
 
 func BenchmarkBridges_Memory_1K(b *testing.B) {

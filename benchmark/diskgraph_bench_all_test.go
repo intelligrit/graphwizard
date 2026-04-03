@@ -482,13 +482,29 @@ func BenchmarkClusteringCoeffParallel_Memory_1K(b *testing.B) {
 
 func BenchmarkClusteringCoeffParallel_Disk_1K(b *testing.B) {
 	rng := rand.New(rand.NewSource(42))
-	dir, cleanup := diskTempDir("bccp")
+	dir, cleanup := diskTempDir("bccpd")
 	defer cleanup()
 	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		structure.ClusteringCoefficientParallel(g)
+	}
+}
+
+func BenchmarkClusteringCoeffParallel_DiskPreload_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bccpp")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	g.PreloadAdjacency()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		structure.ClusteringCoefficientParallel(g)
@@ -879,6 +895,22 @@ func BenchmarkIsolationScore_Disk_1K(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		anomaly.IsolationScore(g)
+	}
+}
+
+func BenchmarkIsolationScore_DiskPreload_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bisop")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	g.PreloadAdjacency()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		anomaly.IsolationScore(g)

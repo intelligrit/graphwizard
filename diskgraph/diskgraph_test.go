@@ -394,6 +394,37 @@ func TestFileExistsAfterClose(t *testing.T) {
 	}
 }
 
+func TestPreloadAdjacency(t *testing.T) {
+	path := buildTriangle(t)
+	g, err := OpenUndirected(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+
+	g.PreloadAdjacency()
+
+	// From should still work.
+	neighbors := collectIDs(g.From(0))
+	if len(neighbors) != 2 {
+		t.Fatalf("From(0) returned %d nodes, want 2", len(neighbors))
+	}
+
+	// HasEdgeBetween should use the cache.
+	if !g.HasEdgeBetween(0, 1) {
+		t.Error("HasEdgeBetween(0,1) = false after preload")
+	}
+	if g.HasEdgeBetween(0, 99) {
+		t.Error("HasEdgeBetween(0,99) = true after preload")
+	}
+
+	// From non-existent node.
+	nodes := g.From(999)
+	if nodes.Next() {
+		t.Error("From(999) should be empty after preload")
+	}
+}
+
 func TestBatchUndirected(t *testing.T) {
 	path := tempPath(t, "batch.db")
 	b, err := NewUndirectedBuilder(path)
