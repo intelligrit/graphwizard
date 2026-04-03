@@ -27,10 +27,16 @@ g, _ := diskgraph.OpenUndirected("graph.db")
 defer g.Close()
 ```
 
-**Memory behavior:** By default, adjacency data is preloaded into
-memory at open time. For a graph with E edges, this uses roughly
-`E * 40` bytes. If the estimated cost exceeds 70% of available system
-memory, it logs a warning and falls back to pure disk reads.
+**Memory behavior:** By default, adjacency data is read directly from
+bolt's memory-mapped file with zero Go heap allocation. For algorithms
+that call `HasEdgeBetween` in tight loops (e.g., ClusteringCoefficient),
+pass `Preload` to cache adjacency in Go memory:
+
+```go
+g, _ := diskgraph.OpenUndirected("graph.db", diskgraph.Preload)
+```
+
+Preload costs roughly `E * 40` bytes:
 
 | Edges | Preload Memory |
 |---|---|
@@ -39,11 +45,8 @@ memory, it logs a warning and falls back to pure disk reads.
 | 83M | ~3.3 GB |
 | 500M | ~20 GB |
 
-For very large graphs, pass `diskgraph.NoPreload`:
-
-```go
-g, _ := diskgraph.OpenUndirected("huge.db", diskgraph.NoPreload)
-```
+If the estimated cost exceeds 70% of available RAM, a warning is logged
+and preloading is skipped. Use `ForcePreload` to override.
 
 **When to use `simple.UndirectedGraph` instead:** Only when you need a
 mutable graph (adding/removing edges after construction) or for

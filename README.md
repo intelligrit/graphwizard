@@ -140,9 +140,10 @@ implementation that is:
   `NoPreload` and the graph reads directly from disk via memory-mapped
   I/O.
 
-- **Safe** — auto-detects available memory at open time. If the
-  adjacency preload would exceed 70% of available RAM, it logs a
-  warning and falls back to disk reads.
+- **Tunable** — pass `Preload` to cache adjacency data in Go memory
+  for O(1) `HasEdgeBetween` on algorithms like ClusteringCoefficient.
+  Without it, reads go through bolt's memory-mapped file with zero
+  heap allocation.
 
 ```go
 // Build once (use Batch for best write performance).

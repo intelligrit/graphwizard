@@ -11,20 +11,28 @@ import (
 type Option func(*openConfig)
 
 type openConfig struct {
-	noPreload    bool
+	preload      bool
 	forcePreload bool
 }
 
-// NoPreload disables automatic adjacency preloading. Use this when the
-// graph's adjacency structure is too large to fit in memory.
-func NoPreload(c *openConfig) {
-	c.noPreload = true
+// Preload enables adjacency preloading at open time. This caches all
+// adjacency lists and neighbor sets in Go memory, making From() and
+// HasEdgeBetween() O(1). This is recommended for algorithms that call
+// HasEdgeBetween in tight loops (e.g., ClusteringCoefficient).
+//
+// If the estimated memory cost exceeds 70% of available system memory,
+// a warning is logged and preloading is skipped. Use ForcePreload to
+// override this check.
+//
+// Memory cost is roughly E * 40 bytes (e.g., 83M edges ~ 3.3 GB).
+func Preload(c *openConfig) {
+	c.preload = true
 }
 
-// ForcePreload forces adjacency preloading even when the estimated memory
-// cost exceeds available memory. Use with caution — this may cause swap
-// pressure on very large graphs.
+// ForcePreload enables adjacency preloading and skips the memory safety
+// check. Use with caution on very large graphs.
 func ForcePreload(c *openConfig) {
+	c.preload = true
 	c.forcePreload = true
 }
 
@@ -33,37 +41,26 @@ func ForcePreload(c *openConfig) {
 // available memory, leaving 30% headroom.
 const memoryThreshold = 0.70
 
-// estimateAdjBytes estimates the memory needed to preload adjacency data
-// for a graph stored in the given bolt adjacency bucket. Each edge is stored
-// as two int64 entries (one per direction for undirected), plus map overhead.
-//
-// Rough formula: adjBucketBytes gives the raw packed data size. The in-memory
-// representation uses ~2.5x that (slice headers, map buckets, set entries).
+// estimateAdjBytes estimates the memory needed to preload adjacency data.
+// Each edge is stored twice (once per direction for undirected), plus map
+// overhead. Conservative estimate: 5x the raw bolt data.
 func estimateAdjBytes(adjBucketSize int64) uint64 {
-	// Each adjacency entry is 8 bytes in bolt. In memory we store:
-	// - adjCache: map[int64][]int64 — 8 bytes per neighbor + slice header
-	// - adjSet: map[int64]map[int64]struct{} — ~40 bytes per entry (map overhead)
-	// Conservative estimate: 5x the raw bolt data.
 	return uint64(adjBucketSize) * 5
 }
 
-// tryAutoPreload attempts to preload adjacency data. It checks available
-// memory and logs a warning if the graph is too large, unless forced.
-func tryAutoPreload(g interface {
+// tryPreload attempts to preload adjacency data, checking available
+// memory unless forced.
+func tryPreload(g interface {
 	preloadAdj()
 	adjBucketSize() int64
 }, cfg openConfig) {
-	if cfg.noPreload {
-		return
-	}
-
 	rawSize := g.adjBucketSize()
 	estimated := estimateAdjBytes(rawSize)
 
 	if !cfg.forcePreload {
 		avail := availableMemory()
 		if avail == 0 {
-			log.Printf("diskgraph: unable to determine available system memory — skipping adjacency preload (estimated %s needed). Use ForcePreload to override, or call PreloadAdjacency() manually.",
+			log.Printf("diskgraph: unable to determine available system memory — skipping adjacency preload (estimated %s needed). Call PreloadAdjacency() manually or use ForcePreload to override.",
 				formatBytes(estimated),
 			)
 			return

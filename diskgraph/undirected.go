@@ -14,9 +14,10 @@ import (
 // graph.Undirected and graph.WeightedUndirected. It reads directly from
 // a memory-mapped bolt file using a single long-lived read transaction.
 //
-// By default, adjacency data is preloaded into memory at open time for
-// fast From() and O(1) HasEdgeBetween(). Pass NoPreload to disable this
-// for graphs too large to fit in memory.
+// By default, the graph reads adjacency data directly from bolt's
+// memory-mapped file. Call PreloadAdjacency() or pass Preload to
+// cache adjacency in Go memory for additional speed on algorithms
+// that call HasEdgeBetween in tight loops (e.g., ClusteringCoefficient).
 type Undirected struct {
 	db    *bolt.DB
 	tx    *bolt.Tx
@@ -34,9 +35,8 @@ type Undirected struct {
 }
 
 // OpenUndirected opens a bolt file previously created by UndirectedBuilder.
-// By default, adjacency data is preloaded into memory for maximum speed.
-// Pass NoPreload to skip this for very large graphs, or ForcePreload to
-// override the automatic memory check.
+// Pass Preload to cache adjacency data in memory for maximum speed, or call
+// PreloadAdjacency() after opening.
 func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 	var cfg openConfig
 	for _, o := range opts {
@@ -74,8 +74,10 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 	g.nodeIDs = ids
 	g.nodeSet = set
 
-	// Auto-preload adjacency with memory check.
-	tryAutoPreload(g, cfg)
+	// Preload adjacency if requested.
+	if cfg.preload {
+		tryPreload(g, cfg)
+	}
 
 	return g, nil
 }

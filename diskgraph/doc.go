@@ -34,18 +34,20 @@
 // The graph file is persistent — build once, open as many times as needed
 // across program runs.
 //
-// # Automatic adjacency preloading
+// # Adjacency preloading
 //
-// By default, OpenUndirected loads adjacency data into memory for maximum
-// speed. If the graph is too large to fit (estimated cost > 70% of available
-// RAM), it logs a warning and falls back to pure disk reads.
+// For algorithms that call HasEdgeBetween in tight loops (e.g.,
+// ClusteringCoefficient), pass Preload to cache adjacency data in
+// Go memory for O(1) lookups:
 //
-//	// Default: auto-preloads for speed
+//	g, _ := diskgraph.OpenUndirected("graph.db", diskgraph.Preload)
+//
+// Or call PreloadAdjacency() after opening:
+//
 //	g, _ := diskgraph.OpenUndirected("graph.db")
+//	g.PreloadAdjacency()
 //
-//	// Huge graph that won't fit in RAM: skip preload
-//	g, _ := diskgraph.OpenUndirected("huge.db", diskgraph.NoPreload)
-//
-//	// Force preload even if memory looks tight
-//	g, _ := diskgraph.OpenUndirected("graph.db", diskgraph.ForcePreload)
+// Preload costs roughly E * 40 bytes (83M edges ~ 3.3 GB). If the
+// estimated cost exceeds 70% of available RAM, a warning is logged and
+// preloading is skipped. Use ForcePreload to override.
 package diskgraph
