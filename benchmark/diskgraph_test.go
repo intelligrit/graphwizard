@@ -11,6 +11,7 @@ import (
 	"github.com/intelligrit/graphwizard/centrality"
 	"github.com/intelligrit/graphwizard/community"
 	"github.com/intelligrit/graphwizard/connectivity"
+	"github.com/intelligrit/graphwizard/embedding"
 	"github.com/intelligrit/graphwizard/similarity"
 	"github.com/intelligrit/graphwizard/structure"
 	"github.com/intelligrit/graphwizard/traverse"
@@ -705,6 +706,216 @@ func BenchmarkEccentricity_Disk_100(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		centrality.Eccentricity(g)
+	}
+}
+
+// --- DFS ---
+
+func BenchmarkDFS_Memory_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(1000, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		traverse.DFS(g, 0)
+	}
+}
+
+func BenchmarkDFS_Disk_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bdfs")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		traverse.DFS(g, 0)
+	}
+}
+
+// --- KCore ---
+
+func BenchmarkKCore_Memory_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(1000, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		connectivity.KCore(3, g)
+	}
+}
+
+func BenchmarkKCore_Disk_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bkc")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		connectivity.KCore(3, g)
+	}
+}
+
+// --- Louvain ---
+
+func BenchmarkLouvain_Memory_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := TwoClusterGraph(50, 0.3, 0.01, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.Louvain(g, 1.0, nil)
+	}
+}
+
+func BenchmarkLouvain_Disk_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("blouv")
+	defer cleanup()
+	g, err := DiskTwoClusterGraph(50, 0.3, 0.01, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.Louvain(g, 1.0, nil)
+	}
+}
+
+// --- LabelPropagation ---
+
+func BenchmarkLabelProp_Memory_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := TwoClusterGraph(500, 0.05, 0.001, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.LabelPropagation(g, 20, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+func BenchmarkLabelProp_Disk_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("blp")
+	defer cleanup()
+	g, err := DiskTwoClusterGraph(500, 0.05, 0.001, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		community.LabelPropagation(g, 20, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+// --- DegreeZScore ---
+
+func BenchmarkDegreeZScore_Memory_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(1000, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		anomaly.DegreeZScore(g)
+	}
+}
+
+func BenchmarkDegreeZScore_Disk_1K(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bzscore")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(1000, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		anomaly.DegreeZScore(g)
+	}
+}
+
+// --- Node2Vec ---
+
+func BenchmarkNode2Vec_Memory_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(100, 3, rng)
+	params := embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+func BenchmarkNode2Vec_Disk_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bn2v")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(100, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	params := embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+	}
+}
+
+// --- Diameter ---
+
+func BenchmarkDiameter_Memory_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := BarabasiAlbert(100, 3, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		centrality.Diameter(g)
+	}
+}
+
+func BenchmarkDiameter_Disk_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bdia")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(100, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		centrality.Diameter(g)
+	}
+}
+
+// --- JaccardAll ---
+
+func BenchmarkJaccardAll_Memory_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	g := ErdosRenyi(100, 0.1, rng)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		similarity.JaccardAll(g, 0.1)
+	}
+}
+
+func BenchmarkJaccardAll_Disk_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("bjall")
+	defer cleanup()
+	g, err := DiskErdosRenyi(100, 0.1, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		similarity.JaccardAll(g, 0.1)
 	}
 }
 

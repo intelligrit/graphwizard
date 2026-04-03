@@ -12,10 +12,14 @@ import (
 
 // Undirected is a read-only, disk-backed undirected graph that implements
 // graph.Undirected and graph.WeightedUndirected. It reads directly from
-// a memory-mapped bolt file.
+// a memory-mapped bolt file using a single long-lived read transaction.
 type Undirected struct {
-	db *bolt.DB
-	n  int64 // cached node count
+	db    *bolt.DB
+	tx    *bolt.Tx
+	nodes *bolt.Bucket
+	edges *bolt.Bucket
+	adj   *bolt.Bucket
+	n     int64
 }
 
 // OpenUndirected opens a bolt file previously created by UndirectedBuilder.
@@ -24,20 +28,33 @@ func OpenUndirected(path string) (*Undirected, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Undirected{db: db, n: nodeCount(db)}, nil
+	n := nodeCount(db)
+
+	tx, err := db.Begin(false)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return &Undirected{
+		db:    db,
+		tx:    tx,
+		nodes: tx.Bucket(bucketNodes),
+		edges: tx.Bucket(bucketEdges),
+		adj:   tx.Bucket(bucketAdj),
+		n:     n,
+	}, nil
 }
 
-// Close releases the bolt database.
-func (g *Undirected) Close() error { return g.db.Close() }
+// Close releases the read transaction and bolt database.
+func (g *Undirected) Close() error {
+	g.tx.Rollback()
+	return g.db.Close()
+}
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Undirected) Node(id int64) graph.Node {
-	var exists bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		exists = tx.Bucket(bucketNodes).Get(int64ToBytes(id)) != nil
-		return nil
-	})
-	if !exists {
+	if g.nodes.Get(int64ToBytes(id)) == nil {
 		return nil
 	}
 	return boltNode{id: id}
@@ -50,26 +67,18 @@ func (g *Undirected) Nodes() graph.Nodes {
 
 // allNodeIDs returns all node IDs by scanning the nodes bucket.
 func (g *Undirected) allNodeIDs() []int64 {
-	var ids []int64
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketNodes)
-		return b.ForEach(func(k, _ []byte) error {
-			ids = append(ids, bytesToInt64(k))
-			return nil
-		})
+	ids := make([]int64, 0, g.n)
+	g.nodes.ForEach(func(k, _ []byte) error {
+		ids = append(ids, bytesToInt64(k))
+		return nil
 	})
 	return ids
 }
 
 // From returns all nodes reachable from the node with the given ID.
 func (g *Undirected) From(id int64) graph.Nodes {
-	var neighbors []int64
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketAdj)
-		v := b.Get(int64ToBytes(id))
-		neighbors = decodeIDs(v)
-		return nil
-	})
+	v := g.adj.Get(int64ToBytes(id))
+	neighbors := decodeIDs(v)
 	if neighbors == nil {
 		return emptyNodes{}
 	}
@@ -78,12 +87,7 @@ func (g *Undirected) From(id int64) graph.Nodes {
 
 // HasEdgeBetween returns whether an edge exists between xid and yid.
 func (g *Undirected) HasEdgeBetween(xid, yid int64) bool {
-	var exists bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		exists = tx.Bucket(bucketEdges).Get(edgeKey(xid, yid)) != nil
-		return nil
-	})
-	return exists
+	return g.edges.Get(edgeKey(xid, yid)) != nil
 }
 
 // Edge returns the edge between xid and yid, or nil.
@@ -101,22 +105,13 @@ func (g *Undirected) EdgeBetween(xid, yid int64) graph.Edge {
 
 // WeightedEdge returns the weighted edge from uid to vid, or nil.
 func (g *Undirected) WeightedEdge(uid, vid int64) graph.WeightedEdge {
-	var w float64
-	var found bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(bucketEdges).Get(edgeKey(uid, vid))
-		if v != nil {
-			w = bytesToFloat64(v)
-			found = true
-		}
-		return nil
-	})
-	if !found {
+	v := g.edges.Get(edgeKey(uid, vid))
+	if v == nil {
 		return nil
 	}
 	return boltWeightedEdge{
 		boltEdge: boltEdge{from: boltNode{id: uid}, to: boltNode{id: vid}},
-		w:        w,
+		w:        bytesToFloat64(v),
 	}
 }
 

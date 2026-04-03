@@ -12,10 +12,15 @@ import (
 
 // Directed is a read-only, disk-backed directed graph that implements
 // graph.Directed and graph.WeightedDirected. It reads directly from
-// a memory-mapped bolt file.
+// a memory-mapped bolt file using a single long-lived read transaction.
 type Directed struct {
-	db *bolt.DB
-	n  int64
+	db     *bolt.DB
+	tx     *bolt.Tx
+	nodes  *bolt.Bucket
+	edges  *bolt.Bucket
+	adj    *bolt.Bucket
+	revAdj *bolt.Bucket
+	n      int64
 }
 
 // OpenDirected opens a bolt file previously created by DirectedBuilder.
@@ -24,20 +29,34 @@ func OpenDirected(path string) (*Directed, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Directed{db: db, n: nodeCount(db)}, nil
+	n := nodeCount(db)
+
+	tx, err := db.Begin(false)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return &Directed{
+		db:     db,
+		tx:     tx,
+		nodes:  tx.Bucket(bucketNodes),
+		edges:  tx.Bucket(bucketEdges),
+		adj:    tx.Bucket(bucketAdj),
+		revAdj: tx.Bucket(bucketRevAdj),
+		n:      n,
+	}, nil
 }
 
-// Close releases the bolt database.
-func (g *Directed) Close() error { return g.db.Close() }
+// Close releases the read transaction and bolt database.
+func (g *Directed) Close() error {
+	g.tx.Rollback()
+	return g.db.Close()
+}
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Directed) Node(id int64) graph.Node {
-	var exists bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		exists = tx.Bucket(bucketNodes).Get(int64ToBytes(id)) != nil
-		return nil
-	})
-	if !exists {
+	if g.nodes.Get(int64ToBytes(id)) == nil {
 		return nil
 	}
 	return boltNode{id: id}
@@ -50,12 +69,10 @@ func (g *Directed) Nodes() graph.Nodes {
 
 // allNodeIDs returns all node IDs from the nodes bucket.
 func (g *Directed) allNodeIDs() []int64 {
-	var ids []int64
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(bucketNodes).ForEach(func(k, _ []byte) error {
-			ids = append(ids, bytesToInt64(k))
-			return nil
-		})
+	ids := make([]int64, 0, g.n)
+	g.nodes.ForEach(func(k, _ []byte) error {
+		ids = append(ids, bytesToInt64(k))
+		return nil
 	})
 	return ids
 }
@@ -63,12 +80,8 @@ func (g *Directed) allNodeIDs() []int64 {
 // From returns all nodes reachable from the node with the given ID
 // (outgoing edges).
 func (g *Directed) From(id int64) graph.Nodes {
-	var neighbors []int64
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(bucketAdj).Get(int64ToBytes(id))
-		neighbors = decodeIDs(v)
-		return nil
-	})
+	v := g.adj.Get(int64ToBytes(id))
+	neighbors := decodeIDs(v)
 	if neighbors == nil {
 		return emptyNodes{}
 	}
@@ -78,12 +91,8 @@ func (g *Directed) From(id int64) graph.Nodes {
 // To returns all nodes that have an edge to the node with the given ID
 // (incoming edges).
 func (g *Directed) To(id int64) graph.Nodes {
-	var sources []int64
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(bucketRevAdj).Get(int64ToBytes(id))
-		sources = decodeIDs(v)
-		return nil
-	})
+	v := g.revAdj.Get(int64ToBytes(id))
+	sources := decodeIDs(v)
 	if sources == nil {
 		return emptyNodes{}
 	}
@@ -93,23 +102,12 @@ func (g *Directed) To(id int64) graph.Nodes {
 // HasEdgeBetween returns whether an edge exists between xid and yid
 // in either direction.
 func (g *Directed) HasEdgeBetween(xid, yid int64) bool {
-	var exists bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketEdges)
-		exists = b.Get(edgeKey(xid, yid)) != nil || b.Get(edgeKey(yid, xid)) != nil
-		return nil
-	})
-	return exists
+	return g.edges.Get(edgeKey(xid, yid)) != nil || g.edges.Get(edgeKey(yid, xid)) != nil
 }
 
 // HasEdgeFromTo returns whether an edge exists from uid to vid.
 func (g *Directed) HasEdgeFromTo(uid, vid int64) bool {
-	var exists bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		exists = tx.Bucket(bucketEdges).Get(edgeKey(uid, vid)) != nil
-		return nil
-	})
-	return exists
+	return g.edges.Get(edgeKey(uid, vid)) != nil
 }
 
 // Edge returns the edge from xid to yid, or nil.
@@ -122,22 +120,13 @@ func (g *Directed) Edge(xid, yid int64) graph.Edge {
 
 // WeightedEdge returns the weighted edge from uid to vid, or nil.
 func (g *Directed) WeightedEdge(uid, vid int64) graph.WeightedEdge {
-	var w float64
-	var found bool
-	_ = g.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(bucketEdges).Get(edgeKey(uid, vid))
-		if v != nil {
-			w = bytesToFloat64(v)
-			found = true
-		}
-		return nil
-	})
-	if !found {
+	v := g.edges.Get(edgeKey(uid, vid))
+	if v == nil {
 		return nil
 	}
 	return boltWeightedEdge{
 		boltEdge: boltEdge{from: boltNode{id: uid}, to: boltNode{id: vid}},
-		w:        w,
+		w:        bytesToFloat64(v),
 	}
 }
 
