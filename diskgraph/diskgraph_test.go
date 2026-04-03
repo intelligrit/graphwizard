@@ -394,6 +394,85 @@ func TestFileExistsAfterClose(t *testing.T) {
 	}
 }
 
+func TestBatchUndirected(t *testing.T) {
+	path := tempPath(t, "batch.db")
+	b, err := NewUndirectedBuilder(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Batch(func(tx *UndirectedTx) error {
+		for i := int64(0); i < 100; i++ {
+			for j := i + 1; j < 100; j++ {
+				if (i+j)%7 == 0 {
+					if err := tx.AddEdge(i, j); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Close()
+
+	g, err := OpenUndirected(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+
+	count := 0
+	nodes := g.Nodes()
+	for nodes.Next() {
+		count++
+	}
+	if count != 100 {
+		t.Errorf("got %d nodes, want 100", count)
+	}
+
+	// Spot check an edge.
+	if !g.HasEdgeBetween(0, 7) {
+		t.Error("expected edge 0-7")
+	}
+}
+
+func TestBatchDirected(t *testing.T) {
+	path := tempPath(t, "dbatch.db")
+	b, err := NewDirectedBuilder(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Batch(func(tx *DirectedTx) error {
+		tx.AddEdge(0, 1)
+		tx.AddEdge(1, 2)
+		tx.AddEdge(2, 0)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Close()
+
+	g, err := OpenDirected(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+
+	if !g.HasEdgeFromTo(0, 1) {
+		t.Error("expected 0->1")
+	}
+	if g.HasEdgeFromTo(1, 0) {
+		t.Error("unexpected 1->0")
+	}
+	ids := collectIDs(g.To(0))
+	if len(ids) != 1 || ids[0] != 2 {
+		t.Errorf("To(0) = %v, want [2]", ids)
+	}
+}
+
 // collectIDs drains a graph.Nodes iterator into a slice of IDs.
 func collectIDs(it graph.Nodes) []int64 {
 	var ids []int64

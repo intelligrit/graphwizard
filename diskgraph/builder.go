@@ -10,13 +10,20 @@ import (
 
 // UndirectedBuilder builds a disk-backed undirected graph.
 // After adding all nodes and edges, call Close to finalize.
+//
+// For best performance when adding many edges, wrap calls in a Batch:
+//
+//	b.Batch(func(tx *diskgraph.UndirectedTx) error {
+//	    tx.AddEdge(0, 1)
+//	    tx.AddEdge(1, 2)
+//	    return nil
+//	})
 type UndirectedBuilder struct {
 	db        *bolt.DB
 	nodeCount int64
 }
 
 // NewUndirectedBuilder creates a new bolt file and returns a builder.
-// The file is created or truncated if it already exists.
 func NewUndirectedBuilder(path string) (*UndirectedBuilder, error) {
 	db, err := bolt.Open(path, 0o600, nil)
 	if err != nil {
@@ -40,57 +47,48 @@ func NewUndirectedBuilder(path string) (*UndirectedBuilder, error) {
 // AddNode adds a node with the given ID.
 func (b *UndirectedBuilder) AddNode(id int64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		bk := tx.Bucket(bucketNodes)
-		key := int64ToBytes(id)
-		if bk.Get(key) != nil {
-			return nil // already exists
-		}
-		b.nodeCount++
-		return bk.Put(key, []byte{1})
+		return addNodeTx(tx, id, &b.nodeCount)
 	})
 }
 
 // AddEdge adds an unweighted edge (weight 1.0) between uid and vid.
-// Both nodes are created if they don't exist.
 func (b *UndirectedBuilder) AddEdge(uid, vid int64) error {
 	return b.AddWeightedEdge(uid, vid, 1.0)
 }
 
 // AddWeightedEdge adds a weighted edge between uid and vid.
-// Both nodes are created if they don't exist.
 func (b *UndirectedBuilder) AddWeightedEdge(uid, vid int64, weight float64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		nodes := tx.Bucket(bucketNodes)
-		edges := tx.Bucket(bucketEdges)
-		adj := tx.Bucket(bucketAdj)
-		w := float64ToBytes(weight)
+		return addUndirectedEdgeTx(tx, uid, vid, weight, &b.nodeCount)
+	})
+}
 
-		// Ensure both nodes exist.
-		for _, id := range []int64{uid, vid} {
-			key := int64ToBytes(id)
-			if nodes.Get(key) == nil {
-				if err := nodes.Put(key, []byte{1}); err != nil {
-					return err
-				}
-				b.nodeCount++
-			}
-		}
+// UndirectedTx provides batched write operations within a single transaction.
+type UndirectedTx struct {
+	tx        *bolt.Tx
+	nodeCount *int64
+}
 
-		// Store edge in both directions for undirected.
-		if err := edges.Put(edgeKey(uid, vid), w); err != nil {
-			return err
-		}
-		if err := edges.Put(edgeKey(vid, uid), w); err != nil {
-			return err
-		}
+// AddNode adds a node within the batch transaction.
+func (t *UndirectedTx) AddNode(id int64) error {
+	return addNodeTx(t.tx, id, t.nodeCount)
+}
 
-		// Update adjacency lists.
-		uKey := int64ToBytes(uid)
-		vKey := int64ToBytes(vid)
-		if err := adj.Put(uKey, appendID(adj.Get(uKey), vid)); err != nil {
-			return err
-		}
-		return adj.Put(vKey, appendID(adj.Get(vKey), uid))
+// AddEdge adds an unweighted edge within the batch transaction.
+func (t *UndirectedTx) AddEdge(uid, vid int64) error {
+	return addUndirectedEdgeTx(t.tx, uid, vid, 1.0, t.nodeCount)
+}
+
+// AddWeightedEdge adds a weighted edge within the batch transaction.
+func (t *UndirectedTx) AddWeightedEdge(uid, vid int64, weight float64) error {
+	return addUndirectedEdgeTx(t.tx, uid, vid, weight, t.nodeCount)
+}
+
+// Batch executes all writes in fn within a single bolt transaction.
+// This is much faster than individual AddEdge calls.
+func (b *UndirectedBuilder) Batch(fn func(tx *UndirectedTx) error) error {
+	return b.db.Update(func(btx *bolt.Tx) error {
+		return fn(&UndirectedTx{tx: btx, nodeCount: &b.nodeCount})
 	})
 }
 
@@ -136,13 +134,7 @@ func NewDirectedBuilder(path string) (*DirectedBuilder, error) {
 // AddNode adds a node with the given ID.
 func (b *DirectedBuilder) AddNode(id int64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		bk := tx.Bucket(bucketNodes)
-		key := int64ToBytes(id)
-		if bk.Get(key) != nil {
-			return nil
-		}
-		b.nodeCount++
-		return bk.Put(key, []byte{1})
+		return addNodeTx(tx, id, &b.nodeCount)
 	})
 }
 
@@ -154,37 +146,35 @@ func (b *DirectedBuilder) AddEdge(uid, vid int64) error {
 // AddWeightedEdge adds a weighted directed edge from uid to vid.
 func (b *DirectedBuilder) AddWeightedEdge(uid, vid int64, weight float64) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
-		nodes := tx.Bucket(bucketNodes)
-		edges := tx.Bucket(bucketEdges)
-		adj := tx.Bucket(bucketAdj)
-		rev := tx.Bucket(bucketRevAdj)
-		w := float64ToBytes(weight)
+		return addDirectedEdgeTx(tx, uid, vid, weight, &b.nodeCount)
+	})
+}
 
-		// Ensure both nodes exist.
-		for _, id := range []int64{uid, vid} {
-			key := int64ToBytes(id)
-			if nodes.Get(key) == nil {
-				if err := nodes.Put(key, []byte{1}); err != nil {
-					return err
-				}
-				b.nodeCount++
-			}
-		}
+// DirectedTx provides batched write operations within a single transaction.
+type DirectedTx struct {
+	tx        *bolt.Tx
+	nodeCount *int64
+}
 
-		// Store edge (one direction only for directed).
-		if err := edges.Put(edgeKey(uid, vid), w); err != nil {
-			return err
-		}
+// AddNode adds a node within the batch transaction.
+func (t *DirectedTx) AddNode(id int64) error {
+	return addNodeTx(t.tx, id, t.nodeCount)
+}
 
-		// Forward adjacency: uid -> vid.
-		uKey := int64ToBytes(uid)
-		if err := adj.Put(uKey, appendID(adj.Get(uKey), vid)); err != nil {
-			return err
-		}
+// AddEdge adds an unweighted directed edge within the batch transaction.
+func (t *DirectedTx) AddEdge(uid, vid int64) error {
+	return addDirectedEdgeTx(t.tx, uid, vid, 1.0, t.nodeCount)
+}
 
-		// Reverse adjacency: vid <- uid.
-		vKey := int64ToBytes(vid)
-		return rev.Put(vKey, appendID(rev.Get(vKey), uid))
+// AddWeightedEdge adds a weighted directed edge within the batch transaction.
+func (t *DirectedTx) AddWeightedEdge(uid, vid int64, weight float64) error {
+	return addDirectedEdgeTx(t.tx, uid, vid, weight, t.nodeCount)
+}
+
+// Batch executes all writes in fn within a single bolt transaction.
+func (b *DirectedBuilder) Batch(fn func(tx *DirectedTx) error) error {
+	return b.db.Update(func(btx *bolt.Tx) error {
+		return fn(&DirectedTx{tx: btx, nodeCount: &b.nodeCount})
 	})
 }
 
@@ -198,4 +188,77 @@ func (b *DirectedBuilder) Close() error {
 		return err
 	}
 	return b.db.Close()
+}
+
+// --- Internal transaction helpers ---
+
+func addNodeTx(tx *bolt.Tx, id int64, count *int64) error {
+	bk := tx.Bucket(bucketNodes)
+	key := int64ToBytes(id)
+	if bk.Get(key) != nil {
+		return nil
+	}
+	*count++
+	return bk.Put(key, []byte{1})
+}
+
+func addUndirectedEdgeTx(tx *bolt.Tx, uid, vid int64, weight float64, count *int64) error {
+	nodes := tx.Bucket(bucketNodes)
+	edges := tx.Bucket(bucketEdges)
+	adj := tx.Bucket(bucketAdj)
+	w := float64ToBytes(weight)
+
+	for _, id := range []int64{uid, vid} {
+		key := int64ToBytes(id)
+		if nodes.Get(key) == nil {
+			if err := nodes.Put(key, []byte{1}); err != nil {
+				return err
+			}
+			*count++
+		}
+	}
+
+	if err := edges.Put(edgeKey(uid, vid), w); err != nil {
+		return err
+	}
+	if err := edges.Put(edgeKey(vid, uid), w); err != nil {
+		return err
+	}
+
+	uKey := int64ToBytes(uid)
+	vKey := int64ToBytes(vid)
+	if err := adj.Put(uKey, appendID(adj.Get(uKey), vid)); err != nil {
+		return err
+	}
+	return adj.Put(vKey, appendID(adj.Get(vKey), uid))
+}
+
+func addDirectedEdgeTx(tx *bolt.Tx, uid, vid int64, weight float64, count *int64) error {
+	nodes := tx.Bucket(bucketNodes)
+	edges := tx.Bucket(bucketEdges)
+	adj := tx.Bucket(bucketAdj)
+	rev := tx.Bucket(bucketRevAdj)
+	w := float64ToBytes(weight)
+
+	for _, id := range []int64{uid, vid} {
+		key := int64ToBytes(id)
+		if nodes.Get(key) == nil {
+			if err := nodes.Put(key, []byte{1}); err != nil {
+				return err
+			}
+			*count++
+		}
+	}
+
+	if err := edges.Put(edgeKey(uid, vid), w); err != nil {
+		return err
+	}
+
+	uKey := int64ToBytes(uid)
+	if err := adj.Put(uKey, appendID(adj.Get(uKey), vid)); err != nil {
+		return err
+	}
+
+	vKey := int64ToBytes(vid)
+	return rev.Put(vKey, appendID(rev.Get(vKey), uid))
 }
