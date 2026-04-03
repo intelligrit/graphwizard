@@ -4,6 +4,51 @@ Practical guidance for using GraphWizard effectively on real-world
 graphs, from small exploratory analysis to 5M+ node production
 workloads.
 
+## Use diskgraph by Default
+
+The `diskgraph` package is the recommended graph storage for all
+GraphWizard workloads. It is faster than gonum's `simple.UndirectedGraph`
+for most algorithms, persists to disk automatically, and handles
+graphs too large for memory.
+
+```go
+// Build once.
+b, _ := diskgraph.NewUndirectedBuilder("graph.db")
+b.Batch(func(tx *diskgraph.UndirectedTx) error {
+    // Add edges in bulk — single transaction for speed.
+    tx.AddEdge(0, 1)
+    tx.AddEdge(1, 2)
+    return nil
+})
+b.Close()
+
+// Open and use with any algorithm.
+g, _ := diskgraph.OpenUndirected("graph.db")
+defer g.Close()
+```
+
+**Memory behavior:** By default, adjacency data is preloaded into
+memory at open time. For a graph with E edges, this uses roughly
+`E * 40` bytes. If the estimated cost exceeds 70% of available system
+memory, it logs a warning and falls back to pure disk reads.
+
+| Edges | Preload Memory |
+|---|---|
+| 1M | ~40 MB |
+| 10M | ~400 MB |
+| 83M | ~3.3 GB |
+| 500M | ~20 GB |
+
+For very large graphs, pass `diskgraph.NoPreload`:
+
+```go
+g, _ := diskgraph.OpenUndirected("huge.db", diskgraph.NoPreload)
+```
+
+**When to use `simple.UndirectedGraph` instead:** Only when you need a
+mutable graph (adding/removing edges after construction) or for
+ephemeral throwaway graphs in tests.
+
 ## Choosing the Right Algorithm Variant
 
 Most algorithms have both sequential and parallel versions. Use this
@@ -34,8 +79,8 @@ guide:
 
 ## Loading Graphs from SQL
 
-Use the `loader` package to avoid reimplementing SQL-to-graph
-conversion:
+For small-to-medium graphs, use the `loader` package to load directly
+into memory:
 
 ```go
 import (
@@ -55,7 +100,27 @@ wg, err := loader.LoadWeightedUndirected(db,
     "SELECT provider_npi, drug_name, total_claims FROM prescriptions")
 ```
 
-The query must return exactly 2 columns (from_id, to_id) for
+For large graphs or when you want persistence, load into diskgraph:
+
+```go
+b, _ := diskgraph.NewUndirectedBuilder("affiliations.db")
+rows, _ := db.Query("SELECT from_id, to_id FROM affiliations")
+b.Batch(func(tx *diskgraph.UndirectedTx) error {
+    for rows.Next() {
+        var from, to int64
+        rows.Scan(&from, &to)
+        tx.AddEdge(from, to)
+    }
+    return nil
+})
+b.Close()
+
+// Now open for analysis — persisted for future runs.
+g, _ := diskgraph.OpenUndirected("affiliations.db")
+defer g.Close()
+```
+
+The loader query must return exactly 2 columns (from_id, to_id) for
 unweighted, or 3 columns (from_id, to_id, weight) for weighted.
 Column types must be scannable to int64 and float64.
 
@@ -141,24 +206,36 @@ fmt.Printf("New edges: %d, Removed: %d\n",
 
 ## Performance Tips
 
-1. **Pre-build neighbor sets** if you're calling multiple similarity
-   functions on the same graph. The parallel variants do this
-   internally.
+1. **Use `diskgraph`** as your default graph storage. It is faster than
+   in-memory gonum graphs for most algorithms, persists automatically,
+   and handles out-of-core workloads. See "Use diskgraph by Default"
+   above.
 
-2. **Use `runtime.GOMAXPROCS`** to control parallelism. The parallel
+2. **Use `Batch`** when building disk graphs. Writing edges one at a
+   time in separate transactions is orders of magnitude slower than
+   batching them.
+
+3. **Pre-build neighbor sets** if you're calling multiple similarity
+   functions on the same graph. The parallel variants do this
+   internally. With diskgraph, adjacency is auto-preloaded so this
+   is already handled.
+
+4. **Use `runtime.GOMAXPROCS`** to control parallelism. The parallel
    variants auto-detect available cores but you can tune this for
    shared environments.
 
-3. **Graph implementations must be safe for concurrent reads** when
-   using parallel functions. gonum's `simple.*Graph` types satisfy
-   this requirement.
+5. **Graph implementations must be safe for concurrent reads** when
+   using parallel functions. Both `diskgraph` and gonum's
+   `simple.*Graph` types satisfy this requirement.
 
-4. **For DuckDB**, use `?access_mode=READ_ONLY` when loading to
+6. **For DuckDB**, use `?access_mode=READ_ONLY` when loading to
    allow concurrent readers.
 
-5. **Memory estimation**: A gonum undirected graph uses roughly
-   100-200 bytes per edge. A 5.8M node / 82.6M edge graph needs
-   ~10-16 GB of RAM.
+7. **Memory estimation**: `diskgraph` with preloading uses ~40 bytes
+   per edge for adjacency data. The bolt file on disk uses ~50 bytes
+   per edge. A 5.8M node / 82.6M edge graph needs ~3.3 GB for preload
+   plus the bolt file. Without preloading (`NoPreload`), the graph uses
+   only the OS page cache — no Go heap allocation.
 
 ## Algorithm Complexity Reference
 

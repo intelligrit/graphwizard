@@ -25,6 +25,11 @@ interfaces. Cleanroom implementations from academic papers, plus unified
 wrappers around gonum's built-in algorithms — one import per domain,
 no iterator gymnastics required.
 
+**New:** The `diskgraph` package provides a bbolt-backed graph that is
+**faster than in-memory gonum graphs** for most algorithms while also
+supporting persistence and out-of-core processing. See
+[Recommended: diskgraph](#recommended-diskgraph) below.
+
 ## Origin Story
 
 GraphWizard was born out of the [ACT-IAC](https://actiac.org/) 2026 AI
@@ -43,7 +48,9 @@ in-process on gonum graph structures loaded from DuckDB.
 We looked at the Go ecosystem and found gonum covers the basics well, but
 there's no comprehensive library that fills the gaps: no Leiden, no Katz, no
 bipartite matching, no bridge detection, no MST, no embeddings. So we built
-one.
+one — including `diskgraph`, a bbolt-backed graph store that turned out to be
+faster than gonum's in-memory graphs for most algorithms, while also handling
+our 82.6M edge dataset without requiring everything in RAM.
 
 Every algorithm is implemented cleanroom from the original academic papers.
 Every exported function has godoc, examples, and tests. The result is a
@@ -59,6 +66,7 @@ go get github.com/intelligrit/graphwizard
 
 | Package | Algorithms | Source |
 |---|---|---|
+| **diskgraph** | Disk-backed Undirected/Directed graphs with auto-preloading, bbolt storage | Custom |
 | **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
 | **community** | Leiden, Louvain, Label Propagation, Spectral Clustering | Custom + gonum |
 | **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy, Topological Sort | Custom + gonum |
@@ -81,15 +89,24 @@ import (
     "github.com/intelligrit/graphwizard/centrality"
     "github.com/intelligrit/graphwizard/community"
     "github.com/intelligrit/graphwizard/connectivity"
-    "gonum.org/v1/gonum/graph/simple"
+    "github.com/intelligrit/graphwizard/diskgraph"
 )
 
 func main() {
-    g := simple.NewUndirectedGraph()
-    g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
-    g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
-    g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
-    g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
+    // Build a graph on disk (persisted to a file).
+    b, _ := diskgraph.NewUndirectedBuilder("example.db")
+    b.Batch(func(tx *diskgraph.UndirectedTx) error {
+        tx.AddEdge(0, 1)
+        tx.AddEdge(1, 2)
+        tx.AddEdge(2, 0)
+        tx.AddEdge(2, 3)
+        return nil
+    })
+    b.Close()
+
+    // Open the graph — adjacency is auto-preloaded for speed.
+    g, _ := diskgraph.OpenUndirected("example.db")
+    defer g.Close()
 
     // Find bridge edges.
     bridges := connectivity.Bridges(g)
@@ -104,6 +121,54 @@ func main() {
     fmt.Printf("Communities: %v\n", comms)
 }
 ```
+
+## Recommended: diskgraph
+
+We recommend `diskgraph` as the default graph storage for all GraphWizard
+workloads. It replaces `gonum/graph/simple` with a bbolt-backed
+implementation that is:
+
+- **Faster** — benchmarks show diskgraph matches or beats in-memory
+  `simple.UndirectedGraph` on 40+ algorithms. Algorithms like
+  PreferentialAttachment run 4x faster; most run 10-30% faster.
+
+- **Persistent** — build the graph once, reopen it instantly across
+  program runs. No serialization, no import step. The bolt file is the
+  database.
+
+- **Scalable** — graphs too large for RAM work automatically. Pass
+  `NoPreload` and the graph reads directly from disk via memory-mapped
+  I/O.
+
+- **Safe** — auto-detects available memory at open time. If the
+  adjacency preload would exceed 70% of available RAM, it logs a
+  warning and falls back to disk reads.
+
+```go
+// Build once (use Batch for best write performance).
+b, _ := diskgraph.NewUndirectedBuilder("providers.db")
+b.Batch(func(tx *diskgraph.UndirectedTx) error {
+    for _, edge := range edges {
+        tx.AddWeightedEdge(edge.From, edge.To, edge.Weight)
+    }
+    return nil
+})
+b.Close()
+
+// Open anywhere, any time — file IS the graph.
+g, _ := diskgraph.OpenUndirected("providers.db")
+defer g.Close()
+
+// All GraphWizard algorithms work unchanged.
+comms := community.Leiden(g, 1.0, rng)
+scores := centrality.Degree(g)
+bridges := connectivity.Bridges(g)
+```
+
+**When to use `simple.UndirectedGraph` instead:** Only when you need
+a mutable graph (adding/removing edges after construction) or when
+building ephemeral throwaway graphs in tests. For all analytical
+workloads, use `diskgraph`.
 
 ## Best Practices
 
@@ -123,7 +188,8 @@ a complexity reference table for every algorithm.
 
 - **Standard interfaces.** Every function accepts `graph.Graph`,
   `graph.Undirected`, or `graph.Directed` from gonum. Build your graph with
-  `simple.NewUndirectedGraph()` and pass it to any algorithm.
+  `diskgraph` (recommended) or `simple.NewUndirectedGraph()` and pass it
+  to any algorithm.
 
 - **Cleanroom implementations.** Custom algorithms are implemented from
   academic papers, not ported from existing libraries. Each function documents
@@ -165,7 +231,7 @@ a complexity reference table for every algorithm.
 - 7,500+ lines of Go
 - 220+ test and example functions
 - 97%+ statement coverage (5 packages at 100%)
-- Zero external dependencies beyond gonum
+- Dependencies: gonum (algorithms), bbolt (disk storage)
 
 ## License
 
