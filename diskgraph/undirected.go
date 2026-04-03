@@ -13,18 +13,22 @@ import (
 // Undirected is a read-only, disk-backed undirected graph that implements
 // graph.Undirected and graph.WeightedUndirected. It reads directly from
 // a memory-mapped bolt file using a single long-lived read transaction.
+//
+// Node IDs and adjacency structure are cached at open time for fast
+// lookups. Call PreloadAdjacency to additionally cache neighbor sets,
+// which makes HasEdgeBetween O(1) instead of a B-tree lookup.
 type Undirected struct {
 	db    *bolt.DB
 	tx    *bolt.Tx
-	nodes *bolt.Bucket
 	edges *bolt.Bucket
 	adj   *bolt.Bucket
-	n     int64
+
+	// nodeIDs is populated at open time — one scan of the nodes bucket.
+	nodeIDs []int64
+	nodeSet map[int64]struct{}
 
 	// adjCache, when non-nil, holds preloaded adjacency lists keyed by
-	// node ID. This accelerates From() and HasEdgeBetween() at the cost
-	// of holding the adjacency structure in memory. Enable via
-	// PreloadAdjacency().
+	// node ID. Enable via PreloadAdjacency().
 	adjCache map[int64][]int64
 	// adjSet mirrors adjCache as sets for O(1) HasEdgeBetween lookups.
 	adjSet map[int64]map[int64]struct{}
@@ -44,25 +48,40 @@ func OpenUndirected(path string) (*Undirected, error) {
 		return nil, err
 	}
 
-	return &Undirected{
+	g := &Undirected{
 		db:    db,
 		tx:    tx,
-		nodes: tx.Bucket(bucketNodes),
 		edges: tx.Bucket(bucketEdges),
 		adj:   tx.Bucket(bucketAdj),
-		n:     n,
-	}, nil
+	}
+
+	// Preload node IDs — this is cheap (just int64s) and avoids
+	// rescanning the nodes bucket on every Nodes() or Node() call.
+	ids := make([]int64, 0, n)
+	set := make(map[int64]struct{}, n)
+	tx.Bucket(bucketNodes).ForEach(func(k, _ []byte) error {
+		id := bytesToInt64(k)
+		ids = append(ids, id)
+		set[id] = struct{}{}
+		return nil
+	})
+	g.nodeIDs = ids
+	g.nodeSet = set
+
+	return g, nil
 }
 
 // PreloadAdjacency loads all adjacency lists into memory. This trades memory
 // for speed — HasEdgeBetween becomes an O(1) set lookup instead of a B-tree
-// traversal, which dramatically improves algorithms like ClusteringCoefficient
-// that call HasEdgeBetween in tight loops.
+// traversal, and From() returns from an in-memory map. This dramatically
+// improves algorithms like ClusteringCoefficient that call HasEdgeBetween
+// in tight loops.
 //
 // For a graph with E edges, this uses roughly O(E * 16) bytes of memory.
 func (g *Undirected) PreloadAdjacency() {
-	g.adjCache = make(map[int64][]int64, g.n)
-	g.adjSet = make(map[int64]map[int64]struct{}, g.n)
+	n := int64(len(g.nodeIDs))
+	g.adjCache = make(map[int64][]int64, n)
+	g.adjSet = make(map[int64]map[int64]struct{}, n)
 
 	g.adj.ForEach(func(k, v []byte) error {
 		id := bytesToInt64(k)
@@ -79,6 +98,8 @@ func (g *Undirected) PreloadAdjacency() {
 
 // Close releases the read transaction and bolt database.
 func (g *Undirected) Close() error {
+	g.nodeIDs = nil
+	g.nodeSet = nil
 	g.adjCache = nil
 	g.adjSet = nil
 	g.tx.Rollback()
@@ -87,7 +108,7 @@ func (g *Undirected) Close() error {
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Undirected) Node(id int64) graph.Node {
-	if g.nodes.Get(int64ToBytes(id)) == nil {
+	if _, ok := g.nodeSet[id]; !ok {
 		return nil
 	}
 	return boltNode{id: id}
@@ -95,17 +116,7 @@ func (g *Undirected) Node(id int64) graph.Node {
 
 // Nodes returns an iterator over all nodes.
 func (g *Undirected) Nodes() graph.Nodes {
-	return newAllNodes(g)
-}
-
-// allNodeIDs returns all node IDs by scanning the nodes bucket.
-func (g *Undirected) allNodeIDs() []int64 {
-	ids := make([]int64, 0, g.n)
-	g.nodes.ForEach(func(k, _ []byte) error {
-		ids = append(ids, bytesToInt64(k))
-		return nil
-	})
-	return ids
+	return newSliceNodes(g.nodeIDs)
 }
 
 // From returns all nodes reachable from the node with the given ID.

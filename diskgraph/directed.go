@@ -16,11 +16,12 @@ import (
 type Directed struct {
 	db     *bolt.DB
 	tx     *bolt.Tx
-	nodes  *bolt.Bucket
 	edges  *bolt.Bucket
 	adj    *bolt.Bucket
 	revAdj *bolt.Bucket
-	n      int64
+
+	nodeIDs []int64
+	nodeSet map[int64]struct{}
 }
 
 // OpenDirected opens a bolt file previously created by DirectedBuilder.
@@ -37,26 +38,39 @@ func OpenDirected(path string) (*Directed, error) {
 		return nil, err
 	}
 
-	return &Directed{
+	g := &Directed{
 		db:     db,
 		tx:     tx,
-		nodes:  tx.Bucket(bucketNodes),
 		edges:  tx.Bucket(bucketEdges),
 		adj:    tx.Bucket(bucketAdj),
 		revAdj: tx.Bucket(bucketRevAdj),
-		n:      n,
-	}, nil
+	}
+
+	ids := make([]int64, 0, n)
+	set := make(map[int64]struct{}, n)
+	tx.Bucket(bucketNodes).ForEach(func(k, _ []byte) error {
+		id := bytesToInt64(k)
+		ids = append(ids, id)
+		set[id] = struct{}{}
+		return nil
+	})
+	g.nodeIDs = ids
+	g.nodeSet = set
+
+	return g, nil
 }
 
 // Close releases the read transaction and bolt database.
 func (g *Directed) Close() error {
+	g.nodeIDs = nil
+	g.nodeSet = nil
 	g.tx.Rollback()
 	return g.db.Close()
 }
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Directed) Node(id int64) graph.Node {
-	if g.nodes.Get(int64ToBytes(id)) == nil {
+	if _, ok := g.nodeSet[id]; !ok {
 		return nil
 	}
 	return boltNode{id: id}
@@ -64,17 +78,7 @@ func (g *Directed) Node(id int64) graph.Node {
 
 // Nodes returns an iterator over all nodes.
 func (g *Directed) Nodes() graph.Nodes {
-	return newAllNodes(g)
-}
-
-// allNodeIDs returns all node IDs from the nodes bucket.
-func (g *Directed) allNodeIDs() []int64 {
-	ids := make([]int64, 0, g.n)
-	g.nodes.ForEach(func(k, _ []byte) error {
-		ids = append(ids, bytesToInt64(k))
-		return nil
-	})
-	return ids
+	return newSliceNodes(g.nodeIDs)
 }
 
 // From returns all nodes reachable from the node with the given ID

@@ -45,39 +45,6 @@ func (it *sliceNodes) Node() graph.Node {
 	return boltNode{id: it.ids[it.pos]}
 }
 
-// allNodes iterates over all node IDs in the bolt nodes bucket.
-// It snapshots the IDs at creation time within a single read transaction.
-type allNodes struct {
-	ids []int64
-	pos int
-}
-
-func newAllNodes(g interface{ allNodeIDs() []int64 }) *allNodes {
-	return &allNodes{ids: g.allNodeIDs(), pos: -1}
-}
-
-func (it *allNodes) Next() bool {
-	it.pos++
-	return it.pos < len(it.ids)
-}
-
-func (it *allNodes) Len() int {
-	remaining := len(it.ids) - it.pos - 1
-	if remaining < 0 {
-		return 0
-	}
-	return remaining
-}
-
-func (it *allNodes) Reset() { it.pos = -1 }
-
-func (it *allNodes) Node() graph.Node {
-	if it.pos < 0 || it.pos >= len(it.ids) {
-		return nil
-	}
-	return boltNode{id: it.ids[it.pos]}
-}
-
 // emptyNodes is a graph.Nodes iterator that is always exhausted.
 type emptyNodes struct{}
 
