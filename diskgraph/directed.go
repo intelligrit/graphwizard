@@ -25,7 +25,12 @@ type Directed struct {
 }
 
 // OpenDirected opens a bolt file previously created by DirectedBuilder.
-func OpenDirected(path string) (*Directed, error) {
+func OpenDirected(path string, opts ...Option) (*Directed, error) {
+	var cfg openConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	db, err := openReadOnly(path)
 	if err != nil {
 		return nil, err

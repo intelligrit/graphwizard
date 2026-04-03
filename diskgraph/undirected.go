@@ -14,9 +14,9 @@ import (
 // graph.Undirected and graph.WeightedUndirected. It reads directly from
 // a memory-mapped bolt file using a single long-lived read transaction.
 //
-// Node IDs and adjacency structure are cached at open time for fast
-// lookups. Call PreloadAdjacency to additionally cache neighbor sets,
-// which makes HasEdgeBetween O(1) instead of a B-tree lookup.
+// By default, adjacency data is preloaded into memory at open time for
+// fast From() and O(1) HasEdgeBetween(). Pass NoPreload to disable this
+// for graphs too large to fit in memory.
 type Undirected struct {
 	db    *bolt.DB
 	tx    *bolt.Tx
@@ -27,15 +27,22 @@ type Undirected struct {
 	nodeIDs []int64
 	nodeSet map[int64]struct{}
 
-	// adjCache, when non-nil, holds preloaded adjacency lists keyed by
-	// node ID. Enable via PreloadAdjacency().
+	// adjCache, when non-nil, holds preloaded adjacency lists.
 	adjCache map[int64][]int64
 	// adjSet mirrors adjCache as sets for O(1) HasEdgeBetween lookups.
 	adjSet map[int64]map[int64]struct{}
 }
 
 // OpenUndirected opens a bolt file previously created by UndirectedBuilder.
-func OpenUndirected(path string) (*Undirected, error) {
+// By default, adjacency data is preloaded into memory for maximum speed.
+// Pass NoPreload to skip this for very large graphs, or ForcePreload to
+// override the automatic memory check.
+func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
+	var cfg openConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	db, err := openReadOnly(path)
 	if err != nil {
 		return nil, err
@@ -55,8 +62,7 @@ func OpenUndirected(path string) (*Undirected, error) {
 		adj:   tx.Bucket(bucketAdj),
 	}
 
-	// Preload node IDs — this is cheap (just int64s) and avoids
-	// rescanning the nodes bucket on every Nodes() or Node() call.
+	// Preload node IDs — cheap (just int64s).
 	ids := make([]int64, 0, n)
 	set := make(map[int64]struct{}, n)
 	tx.Bucket(bucketNodes).ForEach(func(k, _ []byte) error {
@@ -68,17 +74,22 @@ func OpenUndirected(path string) (*Undirected, error) {
 	g.nodeIDs = ids
 	g.nodeSet = set
 
+	// Auto-preload adjacency with memory check.
+	tryAutoPreload(g, cfg)
+
 	return g, nil
 }
 
-// PreloadAdjacency loads all adjacency lists into memory. This trades memory
-// for speed — HasEdgeBetween becomes an O(1) set lookup instead of a B-tree
-// traversal, and From() returns from an in-memory map. This dramatically
-// improves algorithms like ClusteringCoefficient that call HasEdgeBetween
-// in tight loops.
+// PreloadAdjacency loads all adjacency lists into memory. This is called
+// automatically at open time unless NoPreload is passed. You can also call
+// it manually after opening with NoPreload.
 //
-// For a graph with E edges, this uses roughly O(E * 16) bytes of memory.
+// For a graph with E edges, this uses roughly O(E * 40) bytes of memory.
 func (g *Undirected) PreloadAdjacency() {
+	g.preloadAdj()
+}
+
+func (g *Undirected) preloadAdj() {
 	n := int64(len(g.nodeIDs))
 	g.adjCache = make(map[int64][]int64, n)
 	g.adjSet = make(map[int64]map[int64]struct{}, n)
@@ -94,6 +105,12 @@ func (g *Undirected) PreloadAdjacency() {
 		g.adjSet[id] = s
 		return nil
 	})
+}
+
+// adjBucketSize returns the approximate byte size of the adjacency bucket.
+func (g *Undirected) adjBucketSize() int64 {
+	stats := g.adj.Stats()
+	return int64(stats.LeafInuse + stats.BranchInuse)
 }
 
 // Close releases the read transaction and bolt database.
