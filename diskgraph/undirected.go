@@ -3,28 +3,29 @@
 package diskgraph
 
 import (
+	"database/sql"
 	"math"
 
 	"gonum.org/v1/gonum/graph"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // Undirected is a read-only, disk-backed undirected graph that implements
 // graph.Undirected and graph.WeightedUndirected. It reads directly from
-// a memory-mapped bolt file using a single long-lived read transaction.
+// a SQLite database using prepared statements.
 //
-// By default, the graph reads adjacency data directly from bolt's
-// memory-mapped file. Call PreloadAdjacency() or pass Preload to
-// cache adjacency in Go memory for additional speed on algorithms
-// that call HasEdgeBetween in tight loops (e.g., ClusteringCoefficient).
+// By default, the graph reads adjacency data via SQL queries. Call
+// PreloadAdjacency() or pass Preload to cache adjacency in Go memory
+// for additional speed on algorithms that call HasEdgeBetween in tight
+// loops (e.g., ClusteringCoefficient).
 type Undirected struct {
-	db    *bolt.DB
-	tx    *bolt.Tx
-	edges *bolt.Bucket
-	adj   *bolt.Bucket
+	db *sql.DB
 
-	// nodeIDs is populated at open time — one scan of the nodes bucket.
+	// Prepared statements for hot-path queries.
+	stmtFrom     *sql.Stmt
+	stmtHasEdge  *sql.Stmt
+	stmtWeight   *sql.Stmt
+
+	// nodeIDs is populated at open time.
 	nodeIDs []int64
 	nodeSet map[int64]struct{}
 
@@ -34,7 +35,7 @@ type Undirected struct {
 	adjSet map[int64]map[int64]struct{}
 }
 
-// OpenUndirected opens a bolt file previously created by UndirectedBuilder.
+// OpenUndirected opens a SQLite file previously created by UndirectedBuilder.
 // Pass Preload to cache adjacency data in memory for maximum speed, or call
 // PreloadAdjacency() after opening.
 func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
@@ -47,32 +48,46 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 	if err != nil {
 		return nil, err
 	}
-	n := nodeCount(db)
 
-	tx, err := db.Begin(false)
+	g := &Undirected{db: db}
+
+	// Prepare hot-path statements.
+	g.stmtFrom, err = db.Prepare("SELECT dst FROM edges WHERE src = ?")
 	if err != nil {
 		db.Close()
 		return nil, err
 	}
-
-	g := &Undirected{
-		db:    db,
-		tx:    tx,
-		edges: tx.Bucket(bucketEdges),
-		adj:   tx.Bucket(bucketAdj),
+	g.stmtHasEdge, err = db.Prepare("SELECT 1 FROM edges WHERE src = ? AND dst = ? LIMIT 1")
+	if err != nil {
+		g.stmtFrom.Close()
+		db.Close()
+		return nil, err
+	}
+	g.stmtWeight, err = db.Prepare("SELECT weight FROM edges WHERE src = ? AND dst = ? LIMIT 1")
+	if err != nil {
+		g.stmtFrom.Close()
+		g.stmtHasEdge.Close()
+		db.Close()
+		return nil, err
 	}
 
-	// Preload node IDs — cheap (just int64s).
-	ids := make([]int64, 0, n)
-	set := make(map[int64]struct{}, n)
-	tx.Bucket(bucketNodes).ForEach(func(k, _ []byte) error {
-		id := bytesToInt64(k)
-		ids = append(ids, id)
-		set[id] = struct{}{}
-		return nil
-	})
-	g.nodeIDs = ids
-	g.nodeSet = set
+	// Preload node IDs.
+	rows, err := db.Query("SELECT id FROM nodes ORDER BY id")
+	if err != nil {
+		g.closeStmts()
+		db.Close()
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		rows.Scan(&id)
+		g.nodeIDs = append(g.nodeIDs, id)
+	}
+	g.nodeSet = make(map[int64]struct{}, len(g.nodeIDs))
+	for _, id := range g.nodeIDs {
+		g.nodeSet[id] = struct{}{}
+	}
 
 	// Preload adjacency if requested.
 	if cfg.preload {
@@ -82,46 +97,61 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 	return g, nil
 }
 
-// PreloadAdjacency loads all adjacency lists into memory. This is called
-// automatically at open time unless NoPreload is passed. You can also call
-// it manually after opening with NoPreload.
-//
-// For a graph with E edges, this uses roughly O(E * 40) bytes of memory.
+// PreloadAdjacency loads all adjacency lists into memory.
 func (g *Undirected) PreloadAdjacency() {
 	g.preloadAdj()
 }
 
 func (g *Undirected) preloadAdj() {
-	n := int64(len(g.nodeIDs))
+	n := len(g.nodeIDs)
 	g.adjCache = make(map[int64][]int64, n)
 	g.adjSet = make(map[int64]map[int64]struct{}, n)
 
-	g.adj.ForEach(func(k, v []byte) error {
-		id := bytesToInt64(k)
-		neighbors := decodeIDs(v)
-		g.adjCache[id] = neighbors
+	rows, err := g.db.Query("SELECT src, dst FROM edges")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var src, dst int64
+		rows.Scan(&src, &dst)
+		g.adjCache[src] = append(g.adjCache[src], dst)
+	}
+	for id, neighbors := range g.adjCache {
 		s := make(map[int64]struct{}, len(neighbors))
 		for _, nid := range neighbors {
 			s[nid] = struct{}{}
 		}
 		g.adjSet[id] = s
-		return nil
-	})
+	}
 }
 
-// adjBucketSize returns the approximate byte size of the adjacency bucket.
+// adjBucketSize estimates adjacency data size for memory checking.
 func (g *Undirected) adjBucketSize() int64 {
-	stats := g.adj.Stats()
-	return int64(stats.LeafInuse + stats.BranchInuse)
+	var count int64
+	g.db.QueryRow("SELECT COUNT(*) FROM edges").Scan(&count)
+	return count * 16 // 2 int64s per row
 }
 
-// Close releases the read transaction and bolt database.
+func (g *Undirected) closeStmts() {
+	if g.stmtFrom != nil {
+		g.stmtFrom.Close()
+	}
+	if g.stmtHasEdge != nil {
+		g.stmtHasEdge.Close()
+	}
+	if g.stmtWeight != nil {
+		g.stmtWeight.Close()
+	}
+}
+
+// Close releases the database.
 func (g *Undirected) Close() error {
 	g.nodeIDs = nil
 	g.nodeSet = nil
 	g.adjCache = nil
 	g.adjSet = nil
-	g.tx.Rollback()
+	g.closeStmts()
 	return g.db.Close()
 }
 
@@ -147,8 +177,17 @@ func (g *Undirected) From(id int64) graph.Nodes {
 		}
 		return newSliceNodes(neighbors)
 	}
-	v := g.adj.Get(int64ToBytes(id))
-	neighbors := decodeIDs(v)
+	rows, err := g.stmtFrom.Query(id)
+	if err != nil {
+		return emptyNodes{}
+	}
+	defer rows.Close()
+	var neighbors []int64
+	for rows.Next() {
+		var dst int64
+		rows.Scan(&dst)
+		neighbors = append(neighbors, dst)
+	}
 	if neighbors == nil {
 		return emptyNodes{}
 	}
@@ -165,7 +204,9 @@ func (g *Undirected) HasEdgeBetween(xid, yid int64) bool {
 		_, ok := s[yid]
 		return ok
 	}
-	return g.edges.Get(edgeKey(xid, yid)) != nil
+	var one int
+	err := g.stmtHasEdge.QueryRow(xid, yid).Scan(&one)
+	return err == nil
 }
 
 // Edge returns the edge between xid and yid, or nil.
@@ -183,13 +224,14 @@ func (g *Undirected) EdgeBetween(xid, yid int64) graph.Edge {
 
 // WeightedEdge returns the weighted edge from uid to vid, or nil.
 func (g *Undirected) WeightedEdge(uid, vid int64) graph.WeightedEdge {
-	v := g.edges.Get(edgeKey(uid, vid))
-	if v == nil {
+	var w float64
+	err := g.stmtWeight.QueryRow(uid, vid).Scan(&w)
+	if err != nil {
 		return nil
 	}
 	return boltWeightedEdge{
 		boltEdge: boltEdge{from: boltNode{id: uid}, to: boltNode{id: vid}},
-		w:        bytesToFloat64(v),
+		w:        w,
 	}
 }
 
@@ -199,9 +241,6 @@ func (g *Undirected) WeightedEdgeBetween(xid, yid int64) graph.WeightedEdge {
 }
 
 // Weight returns the weight of the edge between xid and yid.
-// If the edge exists, it returns the weight and true.
-// If xid == yid, it returns 0 and true.
-// Otherwise it returns infinity and false.
 func (g *Undirected) Weight(xid, yid int64) (w float64, ok bool) {
 	if xid == yid {
 		return 0, true
