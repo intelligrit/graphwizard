@@ -1059,9 +1059,9 @@ func BenchmarkCompare_Memory_100(b *testing.B) {
 func BenchmarkCompare_Disk_100(b *testing.B) {
 	rng1 := rand.New(rand.NewSource(42))
 	rng2 := rand.New(rand.NewSource(43))
-	dir, cleanup := diskTempDir("bcmp")
-	defer cleanup()
-	g1, err := DiskBarabasiAlbert(100, 3, rng1, dir+"1")
+	dir1, cleanup1 := diskTempDir("bcmp1")
+	defer cleanup1()
+	g1, err := DiskBarabasiAlbert(100, 3, rng1, dir1)
 	if err != nil {
 		b.Fatal(err)
 	}
