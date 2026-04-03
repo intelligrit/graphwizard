@@ -725,6 +725,22 @@ func BenchmarkEccentricity_Disk_100(b *testing.B) {
 	}
 }
 
+func BenchmarkEccentricity_DiskPreload_100(b *testing.B) {
+	rng := rand.New(rand.NewSource(42))
+	dir, cleanup := diskTempDir("beccp")
+	defer cleanup()
+	g, err := DiskBarabasiAlbert(100, 3, rng, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer g.Close()
+	g.PreloadAdjacency()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		centrality.Eccentricity(g)
+	}
+}
+
 // --- DFS ---
 
 func BenchmarkDFS_Memory_1K(b *testing.B) {
