@@ -118,6 +118,11 @@ func (g *Undirected) preloadAdj() {
 		}
 	}
 	g.adj = buildCSR(g.nodeIDs, edgeIter)
+
+	// CSR now handles all adjacency queries; disable mmap to reclaim
+	// the virtual address space. Weight queries still hit SQLite but
+	// the page cache is sufficient.
+	g.db.Exec("PRAGMA mmap_size=0")
 }
 
 // adjBucketSize estimates adjacency data size for memory checking.
