@@ -20,8 +20,8 @@ type Directed struct {
 	stmtHasEdgeDir *sql.Stmt
 	stmtWeight     *sql.Stmt
 
+	// nodeIDs is populated at open time (sorted ascending).
 	nodeIDs []int64
-	nodeSet map[int64]struct{}
 }
 
 // OpenDirected opens a SQLite file previously created by DirectedBuilder.
@@ -73,11 +73,6 @@ func OpenDirected(path string, opts ...Option) (*Directed, error) {
 		rows.Scan(&id)
 		g.nodeIDs = append(g.nodeIDs, id)
 	}
-	g.nodeSet = make(map[int64]struct{}, len(g.nodeIDs))
-	for _, id := range g.nodeIDs {
-		g.nodeSet[id] = struct{}{}
-	}
-
 	return g, nil
 }
 
@@ -99,14 +94,13 @@ func (g *Directed) closeStmts() {
 // Close releases the database.
 func (g *Directed) Close() error {
 	g.nodeIDs = nil
-	g.nodeSet = nil
 	g.closeStmts()
 	return g.db.Close()
 }
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Directed) Node(id int64) graph.Node {
-	if _, ok := g.nodeSet[id]; !ok {
+	if !nodeExists(g.nodeIDs, id) {
 		return nil
 	}
 	return boltNode{id: id}

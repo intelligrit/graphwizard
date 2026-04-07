@@ -24,7 +24,8 @@ type openConfig struct {
 // a warning is logged and preloading is skipped. Use ForcePreload to
 // override this check.
 //
-// Memory cost is roughly E * 40 bytes (e.g., 83M edges ~ 3.3 GB).
+// Memory cost is roughly 8 bytes per edge entry plus 4*(N+1) bytes for
+// offsets. For example, 83M undirected edges (166M DB rows) ≈ 1.3 GB.
 func Preload(c *openConfig) {
 	c.preload = true
 }
@@ -41,11 +42,13 @@ func ForcePreload(c *openConfig) {
 // available memory, leaving 30% headroom.
 const memoryThreshold = 0.70
 
-// estimateAdjBytes estimates the memory needed to preload adjacency data.
-// Each edge is stored twice (once per direction for undirected), plus map
-// overhead. Conservative estimate: 5x the raw bolt data.
+// estimateAdjBytes estimates the memory needed to preload adjacency in CSR
+// format. Each edge row contributes 8 bytes (one int64 target entry) plus
+// a small per-node overhead for the offset table. We use 10 bytes per row
+// as a conservative estimate.
 func estimateAdjBytes(adjBucketSize int64) uint64 {
-	return uint64(adjBucketSize) * 5
+	rows := uint64(adjBucketSize) / 16 // adjBucketSize = count * 16
+	return rows * 10
 }
 
 // tryPreload attempts to preload adjacency data, checking available

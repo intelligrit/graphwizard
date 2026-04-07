@@ -17,22 +17,25 @@ import (
 // PreloadAdjacency() or pass Preload to cache adjacency in Go memory
 // for additional speed on algorithms that call HasEdgeBetween in tight
 // loops (e.g., ClusteringCoefficient).
+//
+// When preloaded, adjacency is stored in CSR (Compressed Sparse Row)
+// format: two flat arrays totalling 8*E + 4*(N+1) bytes. For an 81M-edge
+// graph this is ~1.3 GB instead of the ~20 GB+ that map-based storage
+// would require.
 type Undirected struct {
 	db *sql.DB
 
 	// Prepared statements for hot-path queries.
-	stmtFrom     *sql.Stmt
-	stmtHasEdge  *sql.Stmt
-	stmtWeight   *sql.Stmt
+	stmtFrom    *sql.Stmt
+	stmtHasEdge *sql.Stmt
+	stmtWeight  *sql.Stmt
 
-	// nodeIDs is populated at open time.
+	// nodeIDs is populated at open time (sorted ascending).
+	// Node existence checks use binary search on this slice.
 	nodeIDs []int64
-	nodeSet map[int64]struct{}
 
-	// adjCache, when non-nil, holds preloaded adjacency lists.
-	adjCache map[int64][]int64
-	// adjSet mirrors adjCache as sets for O(1) HasEdgeBetween lookups.
-	adjSet map[int64]map[int64]struct{}
+	// adj, when non-nil, holds preloaded adjacency in CSR format.
+	adj *csr
 }
 
 // OpenUndirected opens a SQLite file previously created by UndirectedBuilder.
@@ -71,7 +74,7 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 		return nil, err
 	}
 
-	// Preload node IDs.
+	// Preload node IDs (sorted for binary search lookups).
 	rows, err := db.Query("SELECT id FROM nodes ORDER BY id")
 	if err != nil {
 		g.closeStmts()
@@ -83,10 +86,6 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 		var id int64
 		rows.Scan(&id)
 		g.nodeIDs = append(g.nodeIDs, id)
-	}
-	g.nodeSet = make(map[int64]struct{}, len(g.nodeIDs))
-	for _, id := range g.nodeIDs {
-		g.nodeSet[id] = struct{}{}
 	}
 
 	// Preload adjacency if requested.
@@ -103,27 +102,22 @@ func (g *Undirected) PreloadAdjacency() {
 }
 
 func (g *Undirected) preloadAdj() {
-	n := len(g.nodeIDs)
-	g.adjCache = make(map[int64][]int64, n)
-	g.adjSet = make(map[int64]map[int64]struct{}, n)
-
-	rows, err := g.db.Query("SELECT src, dst FROM edges")
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var src, dst int64
-		rows.Scan(&src, &dst)
-		g.adjCache[src] = append(g.adjCache[src], dst)
-	}
-	for id, neighbors := range g.adjCache {
-		s := make(map[int64]struct{}, len(neighbors))
-		for _, nid := range neighbors {
-			s[nid] = struct{}{}
+	// We need two passes over the edges: one to count degrees, one to
+	// fill targets. We query SQLite twice rather than buffering all
+	// edges in memory (which would defeat the purpose of CSR).
+	edgeIter := func(yield func(src, dst int64)) {
+		rows, err := g.db.Query("SELECT src, dst FROM edges")
+		if err != nil {
+			return
 		}
-		g.adjSet[id] = s
+		defer rows.Close()
+		for rows.Next() {
+			var src, dst int64
+			rows.Scan(&src, &dst)
+			yield(src, dst)
+		}
 	}
+	g.adj = buildCSR(g.nodeIDs, edgeIter)
 }
 
 // adjBucketSize estimates adjacency data size for memory checking.
@@ -148,16 +142,14 @@ func (g *Undirected) closeStmts() {
 // Close releases the database.
 func (g *Undirected) Close() error {
 	g.nodeIDs = nil
-	g.nodeSet = nil
-	g.adjCache = nil
-	g.adjSet = nil
+	g.adj = nil
 	g.closeStmts()
 	return g.db.Close()
 }
 
 // Node returns the node with the given ID, or nil if it doesn't exist.
 func (g *Undirected) Node(id int64) graph.Node {
-	if _, ok := g.nodeSet[id]; !ok {
+	if !nodeExists(g.nodeIDs, id) {
 		return nil
 	}
 	return boltNode{id: id}
@@ -170,8 +162,8 @@ func (g *Undirected) Nodes() graph.Nodes {
 
 // From returns all nodes reachable from the node with the given ID.
 func (g *Undirected) From(id int64) graph.Nodes {
-	if g.adjCache != nil {
-		neighbors := g.adjCache[id]
+	if g.adj != nil {
+		neighbors := g.adj.neighbors(id)
 		if neighbors == nil {
 			return emptyNodes{}
 		}
@@ -196,13 +188,8 @@ func (g *Undirected) From(id int64) graph.Nodes {
 
 // HasEdgeBetween returns whether an edge exists between xid and yid.
 func (g *Undirected) HasEdgeBetween(xid, yid int64) bool {
-	if g.adjSet != nil {
-		s := g.adjSet[xid]
-		if s == nil {
-			return false
-		}
-		_, ok := s[yid]
-		return ok
+	if g.adj != nil {
+		return g.adj.hasEdge(xid, yid)
 	}
 	var one int
 	err := g.stmtHasEdge.QueryRow(xid, yid).Scan(&one)
