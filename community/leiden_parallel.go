@@ -20,44 +20,11 @@ import (
 // Reference: V. Traag, L. Waltman, N.J. van Eck, "From Louvain to Leiden:
 // guaranteeing well-connected communities", Scientific Reports, 2019.
 func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
-	nodes := g.Nodes()
-	var origIDs []int64
-	for nodes.Next() {
-		origIDs = append(origIDs, nodes.Node().ID())
-	}
+	origIDs, adj, degree, totalWeight := buildWeightedAdj(g)
 	n := len(origIDs)
 	if n == 0 {
 		return make(map[int64]int64)
 	}
-
-	idx := make(map[int64]int, n)
-	for i, id := range origIDs {
-		idx[id] = i
-	}
-
-	adj := make([][]neighbor, n)
-	degree := make([]float64, n)
-	totalWeight := 0.0
-
-	for i, id := range origIDs {
-		it := g.From(id)
-		for it.Next() {
-			j, ok := idx[it.Node().ID()]
-			if !ok {
-				continue
-			}
-			w := 1.0
-			if wg, ok := g.(graph.Weighted); ok {
-				if ew, ok := wg.Weight(id, origIDs[j]); ok {
-					w = ew
-				}
-			}
-			adj[i] = append(adj[i], neighbor{node: j, weight: w})
-			degree[i] += w
-			totalWeight += w
-		}
-	}
-	totalWeight /= 2
 
 	membership := make([]int, n)
 	for i := range membership {

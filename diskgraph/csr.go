@@ -26,6 +26,12 @@ type csr struct {
 	// indices) in a single contiguous slice. Each per-node segment
 	// is sorted for binary search.
 	targets []int64
+
+	// denseTargets mirrors targets but stores dense indices (int32)
+	// instead of original node IDs. Built once at preload time so
+	// algorithms can read dense-indexed adjacency without copying.
+	// Memory cost: 4*E bytes (half of targets).
+	denseTargets []int32
 }
 
 // buildCSR constructs a CSR from sorted nodeIDs and an edge stream.
@@ -69,10 +75,17 @@ func buildCSR(nodeIDs []int64, edges func(yield func(src, dst int64))) *csr {
 		slices.Sort(seg)
 	}
 
+	// Build dense-index version of targets for DenseAdjacency consumers.
+	denseTargets := make([]int32, totalEdges)
+	for i, tid := range targets {
+		denseTargets[i] = int32(searchID(nodeIDs, tid))
+	}
+
 	return &csr{
-		nodeIDs: nodeIDs,
-		offsets: offsets,
-		targets: targets,
+		nodeIDs:      nodeIDs,
+		offsets:      offsets,
+		targets:      targets,
+		denseTargets: denseTargets,
 	}
 }
 
@@ -89,6 +102,20 @@ func (c *csr) neighbors(id int64) []int64 {
 		return nil
 	}
 	return c.targets[lo:hi]
+}
+
+// denseNeighbors returns the dense indices of neighbors for the node at dense
+// index i. Returns nil if i is out of range or the node has no neighbors.
+func (c *csr) denseNeighbors(i int) []int32 {
+	if i < 0 || i >= len(c.nodeIDs) {
+		return nil
+	}
+	lo := c.offsets[i]
+	hi := c.offsets[i+1]
+	if lo == hi {
+		return nil
+	}
+	return c.denseTargets[lo:hi]
 }
 
 // hasEdge returns true if there is an edge from xid to yid.

@@ -5,6 +5,7 @@ package community
 import (
 	"math/rand"
 
+	"github.com/intelligrit/graphwizard"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -23,44 +24,11 @@ type neighbor struct {
 // Reference: V. Traag, L. Waltman, N.J. van Eck, "From Louvain to Leiden:
 // guaranteeing well-connected communities", Scientific Reports, 2019.
 func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
-	nodes := g.Nodes()
-	var origIDs []int64
-	for nodes.Next() {
-		origIDs = append(origIDs, nodes.Node().ID())
-	}
+	origIDs, adj, degree, totalWeight := buildWeightedAdj(g)
 	n := len(origIDs)
 	if n == 0 {
 		return make(map[int64]int64)
 	}
-
-	idx := make(map[int64]int, n)
-	for i, id := range origIDs {
-		idx[id] = i
-	}
-
-	adj := make([][]neighbor, n)
-	degree := make([]float64, n)
-	totalWeight := 0.0
-
-	for i, id := range origIDs {
-		it := g.From(id)
-		for it.Next() {
-			j, ok := idx[it.Node().ID()]
-			if !ok {
-				continue
-			}
-			w := 1.0
-			if wg, ok := g.(graph.Weighted); ok {
-				if ew, ok := wg.Weight(id, origIDs[j]); ok {
-					w = ew
-				}
-			}
-			adj[i] = append(adj[i], neighbor{node: j, weight: w})
-			degree[i] += w
-			totalWeight += w
-		}
-	}
-	totalWeight /= 2
 
 	// membership[i] = current community label for original node i.
 	membership := make([]int, n)
@@ -282,5 +250,89 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 	}
 
 	return newComm, newAdj, newDegree, newSelfLoops, newN, aggMap
+}
+
+// buildWeightedAdj constructs dense-indexed weighted adjacency lists.
+// If the graph implements DenseAdjacency (e.g. diskgraph with preloaded CSR),
+// it reads directly from the shared structure — zero SQL queries and no
+// duplicate adjacency copy for unweighted graphs.
+func buildWeightedAdj(g graph.Undirected) (origIDs []int64, adj [][]neighbor, degree []float64, totalWeight float64) {
+	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+		return buildWeightedAdjFromDense(g, da)
+	}
+	return buildWeightedAdjFromIter(g)
+}
+
+func buildWeightedAdjFromDense(g graph.Undirected, da graphwizard.DenseAdjacency) ([]int64, [][]neighbor, []float64, float64) {
+	origIDs := da.NodeIDs()
+	n := da.NumNodes()
+	adj := make([][]neighbor, n)
+	degree := make([]float64, n)
+	totalWeight := 0.0
+
+	wg, isWeighted := g.(graph.Weighted)
+
+	for i := 0; i < n; i++ {
+		nbs := da.DenseNeighbors(i)
+		if len(nbs) == 0 {
+			continue
+		}
+		adj[i] = make([]neighbor, len(nbs))
+		for k, j := range nbs {
+			w := 1.0
+			if isWeighted {
+				if ew, ok := wg.Weight(origIDs[i], origIDs[j]); ok {
+					w = ew
+				}
+			}
+			adj[i][k] = neighbor{node: int(j), weight: w}
+			degree[i] += w
+			totalWeight += w
+		}
+	}
+	totalWeight /= 2
+	return origIDs, adj, degree, totalWeight
+}
+
+func buildWeightedAdjFromIter(g graph.Undirected) ([]int64, [][]neighbor, []float64, float64) {
+	nodes := g.Nodes()
+	var origIDs []int64
+	for nodes.Next() {
+		origIDs = append(origIDs, nodes.Node().ID())
+	}
+	n := len(origIDs)
+	if n == 0 {
+		return nil, nil, nil, 0
+	}
+
+	idx := make(map[int64]int, n)
+	for i, id := range origIDs {
+		idx[id] = i
+	}
+
+	adj := make([][]neighbor, n)
+	degree := make([]float64, n)
+	totalWeight := 0.0
+
+	for i, id := range origIDs {
+		it := g.From(id)
+		for it.Next() {
+			j, ok := idx[it.Node().ID()]
+			if !ok {
+				continue
+			}
+			w := 1.0
+			if wg, ok := g.(graph.Weighted); ok {
+				if ew, ok := wg.Weight(id, origIDs[j]); ok {
+					w = ew
+				}
+			}
+			adj[i] = append(adj[i], neighbor{node: j, weight: w})
+			degree[i] += w
+			totalWeight += w
+		}
+	}
+	totalWeight /= 2
+	return origIDs, adj, degree, totalWeight
 }
 

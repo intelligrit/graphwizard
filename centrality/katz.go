@@ -5,6 +5,7 @@ package centrality
 import (
 	"math"
 
+	"github.com/intelligrit/graphwizard"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -92,6 +93,11 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 // KatzUndirected returns the Katz centrality for each node in an undirected
 // graph by treating each undirected edge as two directed edges.
 func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+	// Fast path: use precomputed dense adjacency when available.
+	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+		return katzUndirectedDense(da, alpha, beta, tol, maxIter)
+	}
+
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -138,6 +144,47 @@ func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) m
 			diff += math.Abs(xNew[i] - x[i])
 		}
 		x = xNew
+		if diff < tol {
+			break
+		}
+	}
+
+	result := make(map[int64]float64, n)
+	for i, id := range ids {
+		result[id] = x[i]
+	}
+	return result
+}
+
+// katzUndirectedDense uses DenseAdjacency to avoid building a separate adj copy.
+// The hot loop reads DenseNeighbors directly — no allocation beyond x and xNew.
+func katzUndirectedDense(da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+	ids := da.NodeIDs()
+	n := da.NumNodes()
+	if n == 0 {
+		return make(map[int64]float64)
+	}
+
+	x := make([]float64, n)
+	xNew := make([]float64, n)
+
+	for iter := 0; iter < maxIter; iter++ {
+		for i := range xNew {
+			xNew[i] = 0
+		}
+		for i := 0; i < n; i++ {
+			sum := 0.0
+			for _, j := range da.DenseNeighbors(i) {
+				sum += x[j]
+			}
+			xNew[i] = alpha*sum + beta
+		}
+
+		diff := 0.0
+		for i := 0; i < n; i++ {
+			diff += math.Abs(xNew[i] - x[i])
+		}
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}

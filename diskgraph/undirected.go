@@ -244,6 +244,29 @@ func (g *Undirected) Weight(xid, yid int64) (w float64, ok bool) {
 	return math.Inf(1), false
 }
 
+// NodeIDs returns the original node IDs in dense-index order.
+// Returns nil if adjacency has not been preloaded.
+func (g *Undirected) NodeIDs() []int64 {
+	if g.adj == nil {
+		return nil
+	}
+	return g.adj.nodeIDs
+}
+
+// DenseNeighbors returns the dense indices of all neighbors of the node
+// at dense index i. Returns nil if adjacency has not been preloaded.
+func (g *Undirected) DenseNeighbors(i int) []int32 {
+	if g.adj == nil {
+		return nil
+	}
+	return g.adj.denseNeighbors(i)
+}
+
+// NumNodes returns the number of nodes.
+func (g *Undirected) NumNodes() int {
+	return len(g.nodeIDs)
+}
+
 // Compile-time interface checks.
 var (
 	_ graph.Undirected         = (*Undirected)(nil)

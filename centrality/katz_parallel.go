@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/intelligrit/graphwizard"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -92,6 +93,11 @@ func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[i
 // KatzUndirectedParallel returns the Katz centrality for each node in an
 // undirected graph, with power iteration parallelized.
 func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+	// Fast path: use precomputed dense adjacency when available.
+	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+		return katzUndirectedParallelDense(da, alpha, beta, tol, maxIter)
+	}
+
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -153,6 +159,60 @@ func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIte
 			diff += math.Abs(xNew[i] - x[i])
 		}
 		x = xNew
+		if diff < tol {
+			break
+		}
+	}
+
+	result := make(map[int64]float64, n)
+	for i, id := range ids {
+		result[id] = x[i]
+	}
+	return result
+}
+
+func katzUndirectedParallelDense(da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+	ids := da.NodeIDs()
+	n := da.NumNodes()
+	if n == 0 {
+		return make(map[int64]float64)
+	}
+
+	workers := runtime.GOMAXPROCS(0)
+	x := make([]float64, n)
+	xNew := make([]float64, n)
+
+	for iter := 0; iter < maxIter; iter++ {
+		for i := range xNew {
+			xNew[i] = 0
+		}
+
+		var wg sync.WaitGroup
+		chunkSize := (n + workers - 1) / workers
+		for start := 0; start < n; start += chunkSize {
+			end := start + chunkSize
+			if end > n {
+				end = n
+			}
+			wg.Add(1)
+			go func(lo, hi int) {
+				defer wg.Done()
+				for i := lo; i < hi; i++ {
+					sum := 0.0
+					for _, j := range da.DenseNeighbors(i) {
+						sum += x[j]
+					}
+					xNew[i] = alpha*sum + beta
+				}
+			}(start, end)
+		}
+		wg.Wait()
+
+		diff := 0.0
+		for i := 0; i < n; i++ {
+			diff += math.Abs(xNew[i] - x[i])
+		}
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}
