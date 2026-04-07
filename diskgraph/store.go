@@ -27,26 +27,29 @@ func openReadOnly(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("diskgraph: open %s: %w", path, err)
 	}
 	db.SetMaxOpenConns(1)
-	pragmas(db)
+	commonPragmas(db)
+	db.Exec("PRAGMA mmap_size=268435456") // 256MB mmap for read queries
 	return db, nil
 }
 
 // openReadWrite opens a SQLite database for writing.
+// mmap is deliberately disabled: during bulk inserts the file grows
+// continuously, and mmap causes the OS to map it all into RSS.
 func openReadWrite(path string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", path+"?_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("diskgraph: create %s: %w", path, err)
 	}
 	db.SetMaxOpenConns(1)
-	pragmas(db)
+	commonPragmas(db)
+	db.Exec("PRAGMA mmap_size=0") // no mmap during writes
 	return db, nil
 }
 
-func pragmas(db *sql.DB) {
+func commonPragmas(db *sql.DB) {
 	db.Exec("PRAGMA journal_mode=WAL")
 	db.Exec("PRAGMA synchronous=NORMAL")
 	db.Exec("PRAGMA cache_size=-64000") // 64MB cache
-	db.Exec("PRAGMA mmap_size=268435456") // 256MB mmap
 	db.Exec("PRAGMA temp_store=MEMORY")
 }
 
