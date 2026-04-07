@@ -44,6 +44,10 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 	// selfLoops tracks intra-community weight for each aggregate node.
 	selfLoops := make([]float64, n)
 
+	// Reusable buffers for aggregate() — allocated once, cleared each iteration.
+	edgeWeightsBuf := make(map[edgeKey]float64)
+	remapBuf := make(map[int]int)
+
 	for iter := 0; iter < 100; iter++ {
 		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, rng)
 		refined := refine(adj, degree, comm, curN, rng)
@@ -64,7 +68,7 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 		}
 
 		var aggMap []int
-		comm, adj, degree, selfLoops, curN, aggMap = aggregate(refined, adj, degree, selfLoops, curN)
+		comm, adj, degree, selfLoops, curN, aggMap = aggregate(refined, adj, degree, selfLoops, curN, remapBuf, edgeWeightsBuf)
 
 		for i := 0; i < n; i++ {
 			membership[i] = aggMap[membership[i]]
@@ -193,8 +197,15 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 	return refined
 }
 
-func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n int) ([]int, [][]neighbor, []float64, []float64, int, []int) {
-	remap := make(map[int]int)
+// edgeKey identifies a directed community→community edge for aggregation.
+type edgeKey struct{ from, to int }
+
+func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n int, remap map[int]int, edgeWeights map[edgeKey]float64) ([]int, [][]neighbor, []float64, []float64, int, []int) {
+	// Clear reusable buffers.
+	for k := range remap {
+		delete(remap, k)
+	}
+
 	newN := 0
 	for i := 0; i < n; i++ {
 		if _, ok := remap[refined[i]]; !ok {
@@ -236,9 +247,10 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 		newSelfLoops[i] /= 2
 	}
 
-	// Aggregate inter-community edges.
-	type edgeKey struct{ from, to int }
-	edgeWeights := make(map[edgeKey]float64)
+	// Aggregate inter-community edges using reusable map.
+	for k := range edgeWeights {
+		delete(edgeWeights, k)
+	}
 	for i := 0; i < n; i++ {
 		ci := remap[refined[i]]
 		for _, nb := range adj[i] {

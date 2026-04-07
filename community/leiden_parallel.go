@@ -38,6 +38,9 @@ func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[
 	curN := n
 	selfLoops := make([]float64, n)
 
+	edgeWeightsBuf := make(map[edgeKey]float64)
+	remapBuf := make(map[int]int)
+
 	for iter := 0; iter < 100; iter++ {
 		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, rng)
 		refined := refineParallel(adj, degree, comm, curN, rng)
@@ -57,7 +60,7 @@ func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[
 		}
 
 		var aggMap []int
-		comm, adj, degree, selfLoops, curN, aggMap = aggregate(refined, adj, degree, selfLoops, curN)
+		comm, adj, degree, selfLoops, curN, aggMap = aggregate(refined, adj, degree, selfLoops, curN, remapBuf, edgeWeightsBuf)
 
 		for i := 0; i < n; i++ {
 			membership[i] = aggMap[membership[i]]
