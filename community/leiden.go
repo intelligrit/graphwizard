@@ -99,11 +99,14 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 		sigmaTot[comm[i]] += degree[i]
 	}
 
+	commWeights := make(map[int]float64)
 	changed := true
 	for changed {
 		changed = false
 		for _, i := range order {
-			commWeights := make(map[int]float64)
+			for k := range commWeights {
+				delete(commWeights, k)
+			}
 			for _, nb := range adj[i] {
 				commWeights[comm[nb.node]] += nb.weight
 			}
@@ -156,6 +159,7 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		commMembers[comm[i]] = append(commMembers[comm[i]], i)
 	}
 
+	subWeights := make(map[int]float64)
 	for _, members := range commMembers {
 		if len(members) <= 1 {
 			continue
@@ -163,7 +167,9 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		perm := rng.Perm(len(members))
 		for _, pi := range perm {
 			i := members[pi]
-			subWeights := make(map[int]float64)
+			for k := range subWeights {
+				delete(subWeights, k)
+			}
 			for _, nb := range adj[i] {
 				if comm[nb.node] == comm[i] {
 					subWeights[refined[nb.node]] += nb.weight

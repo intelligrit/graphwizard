@@ -136,9 +136,12 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 				for _, i := range cw.members {
 					localRefined[i] = i
 				}
+				subWeights := make(map[int]float64)
 				for _, pi := range perm {
 					i := cw.members[pi]
-					subWeights := make(map[int]float64)
+					for k := range subWeights {
+						delete(subWeights, k)
+					}
 					for _, nb := range adj[i] {
 						if comm[nb.node] == comm[i] {
 							subWeights[localRefined[nb.node]] += nb.weight
