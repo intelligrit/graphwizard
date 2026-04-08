@@ -27,3 +27,15 @@ type DenseAdjacency interface {
 	// NumNodes returns the number of nodes (the length of NodeIDs).
 	NumNodes() int
 }
+
+// EdgeScanner is an optional interface for graphs that can stream all
+// edges efficiently (e.g. a single sequential table scan). This avoids
+// the N+E individual queries that the From()+Weight() pattern requires.
+//
+// Each directed entry (src, dst, weight) is yielded exactly once.
+// For undirected graphs stored with both directions, both (u,v) and
+// (v,u) are yielded.
+type EdgeScanner interface {
+	// ScanWeightedEdges calls yield for every directed edge entry.
+	ScanWeightedEdges(yield func(src, dst int64, weight float64))
+}

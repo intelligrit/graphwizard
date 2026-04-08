@@ -271,14 +271,52 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 }
 
 // buildWeightedAdj constructs dense-indexed weighted adjacency lists.
-// If the graph implements DenseAdjacency (e.g. diskgraph with preloaded CSR),
-// it reads directly from the shared structure — zero SQL queries and no
-// duplicate adjacency copy for unweighted graphs.
+// It picks the fastest available path:
+//  1. DenseAdjacency (preloaded CSR) — zero SQL, shares memory.
+//  2. EdgeScanner (unpreloaded diskgraph) — one sequential table scan.
+//  3. Fallback iter — per-node From()+Weight() queries.
 func buildWeightedAdj(g graph.Undirected) (origIDs []int64, adj [][]neighbor, degree []float64, totalWeight float64) {
 	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
 		return buildWeightedAdjFromDense(g, da)
 	}
+	if es, ok := g.(graphwizard.EdgeScanner); ok {
+		return buildWeightedAdjFromScan(g, es)
+	}
 	return buildWeightedAdjFromIter(g)
+}
+
+func buildWeightedAdjFromScan(g graph.Undirected, es graphwizard.EdgeScanner) ([]int64, [][]neighbor, []float64, float64) {
+	nodes := g.Nodes()
+	var origIDs []int64
+	for nodes.Next() {
+		origIDs = append(origIDs, nodes.Node().ID())
+	}
+	n := len(origIDs)
+	if n == 0 {
+		return nil, nil, nil, 0
+	}
+
+	idx := make(map[int64]int, n)
+	for i, id := range origIDs {
+		idx[id] = i
+	}
+
+	adj := make([][]neighbor, n)
+	degree := make([]float64, n)
+	totalWeight := 0.0
+
+	es.ScanWeightedEdges(func(src, dst int64, w float64) {
+		i, ok1 := idx[src]
+		j, ok2 := idx[dst]
+		if !ok1 || !ok2 {
+			return
+		}
+		adj[i] = append(adj[i], neighbor{node: j, weight: w})
+		degree[i] += w
+		totalWeight += w
+	})
+	totalWeight /= 2
+	return origIDs, adj, degree, totalWeight
 }
 
 func buildWeightedAdjFromDense(g graph.Undirected, da graphwizard.DenseAdjacency) ([]int64, [][]neighbor, []float64, float64) {

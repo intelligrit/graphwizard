@@ -267,6 +267,24 @@ func (g *Undirected) NumNodes() int {
 	return len(g.nodeIDs)
 }
 
+// ScanWeightedEdges streams all directed edge entries via a single
+// sequential table scan. For an 81M-edge undirected graph this yields
+// 163M rows but avoids the 166M random B-tree lookups that the
+// From()+Weight() pattern would require.
+func (g *Undirected) ScanWeightedEdges(yield func(src, dst int64, weight float64)) {
+	rows, err := g.db.Query("SELECT src, dst, weight FROM edges")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var src, dst int64
+		var w float64
+		rows.Scan(&src, &dst, &w)
+		yield(src, dst, w)
+	}
+}
+
 // Compile-time interface checks.
 var (
 	_ graph.Undirected         = (*Undirected)(nil)
