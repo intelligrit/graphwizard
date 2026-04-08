@@ -94,7 +94,9 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 // graph by treating each undirected edge as two directed edges.
 func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	// Fast path: use precomputed dense adjacency when available.
-	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+	// NodeIDs() returns nil when the backing store hasn't been preloaded,
+	// so check that the dense structure is actually populated.
+	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
 		return katzUndirectedDense(da, alpha, beta, tol, maxIter)
 	}
 

@@ -94,7 +94,9 @@ func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[i
 // undirected graph, with power iteration parallelized.
 func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	// Fast path: use precomputed dense adjacency when available.
-	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+	// NodeIDs() returns nil when the backing store hasn't been preloaded,
+	// so check that the dense structure is actually populated.
+	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
 		return katzUndirectedParallelDense(da, alpha, beta, tol, maxIter)
 	}
 

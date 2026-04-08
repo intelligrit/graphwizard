@@ -275,7 +275,7 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 // it reads directly from the shared structure — zero SQL queries and no
 // duplicate adjacency copy for unweighted graphs.
 func buildWeightedAdj(g graph.Undirected) (origIDs []int64, adj [][]neighbor, degree []float64, totalWeight float64) {
-	if da, ok := g.(graphwizard.DenseAdjacency); ok {
+	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
 		return buildWeightedAdjFromDense(g, da)
 	}
 	return buildWeightedAdjFromIter(g)
