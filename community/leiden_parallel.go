@@ -42,7 +42,7 @@ func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[
 	remapBuf := make(map[int]int)
 
 	for iter := 0; iter < 100; iter++ {
-		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, rng)
+		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, defaultMaxLocalSweeps, rng)
 		refined := refineParallel(adj, degree, comm, curN, rng)
 
 		if iter == 0 {

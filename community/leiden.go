@@ -49,7 +49,7 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 	remapBuf := make(map[int]int)
 
 	for iter := 0; iter < 100; iter++ {
-		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, rng)
+		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, defaultMaxLocalSweeps, rng)
 		refined := refine(adj, degree, comm, curN, rng)
 
 		// Update membership.
@@ -93,9 +93,18 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 	return result
 }
 
-func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int, totalWeight, resolution float64, rng *rand.Rand) bool {
+// defaultMaxLocalSweeps bounds the number of full node sweeps inside
+// localMove. The Leiden paper converges in a handful of sweeps on
+// well-structured data; a hard cap prevents pathological oscillation
+// on hub-heavy graphs (e.g. bipartite provider↔drug networks).
+const defaultMaxLocalSweeps = 10
+
+func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int, totalWeight, resolution float64, maxSweeps int, rng *rand.Rand) bool {
 	moved := false
-	order := rng.Perm(n)
+	order := make([]int, n)
+	for i := range order {
+		order[i] = i
+	}
 
 	// Maintain sigmaTot incrementally: O(1) lookup instead of O(n) scan.
 	sigmaTot := make(map[int]float64)
@@ -104,9 +113,10 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 	}
 
 	commWeights := make(map[int]float64)
-	changed := true
-	for changed {
-		changed = false
+	for sweep := 0; sweep < maxSweeps; sweep++ {
+		// Reshuffle each sweep to break deterministic oscillation cycles.
+		rng.Shuffle(n, func(i, j int) { order[i], order[j] = order[j], order[i] })
+		changed := false
 		for _, i := range order {
 			for k := range commWeights {
 				delete(commWeights, k)
@@ -147,6 +157,9 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 				changed = true
 				moved = true
 			}
+		}
+		if !changed {
+			break
 		}
 	}
 	return moved
