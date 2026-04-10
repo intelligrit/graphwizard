@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph"
@@ -22,7 +23,7 @@ func TestLouvain_TwoClusters(t *testing.T) {
 	// Bridge
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	comms := Louvain(g, 1.0, nil)
+	comms := Louvain(context.Background(), g, 1.0, nil)
 	if comms[0] != comms[1] || comms[1] != comms[2] {
 		t.Errorf("cluster A should be in same community")
 	}
@@ -44,7 +45,7 @@ func TestLouvainQ_Triangle(t *testing.T) {
 	communities := [][]graph.Node{
 		{simple.Node(0), simple.Node(1), simple.Node(2)},
 	}
-	q := LouvainQ(g, communities, 1.0)
+	q := LouvainQ(context.Background(), g, communities, 1.0)
 	if q < 0 {
 		t.Errorf("Q for single-community triangle should be >= 0, got %f", q)
 	}

@@ -3,6 +3,9 @@
 package structure
 
 import (
+	"context"
+
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -13,7 +16,7 @@ import (
 // counted once in the total but contributes +1 to each of its three nodes.
 //
 // Time complexity: O(V * E) in the worst case.
-func TriangleCount(g graph.Undirected) (perNode map[int64]int, total int) {
+func TriangleCount(ctx context.Context, g graph.Undirected) (perNode map[int64]int, total int) {
 	perNode = make(map[int64]int)
 	nodes := g.Nodes()
 	var ids []int64
@@ -36,7 +39,9 @@ func TriangleCount(g graph.Undirected) (perNode map[int64]int, total int) {
 
 	// For each edge (u, v) where u < v, count common neighbors w > v.
 	totalTriangles := 0
-	for _, u := range ids {
+	n := len(ids)
+	for i, u := range ids {
+		progress.Report(ctx, progress.Progress{Phase: "nodes", Step: i, Total: n})
 		for v := range neighborSets[u] {
 			if v <= u {
 				continue

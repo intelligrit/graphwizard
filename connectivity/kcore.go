@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/topo"
 )
@@ -14,7 +16,7 @@ import (
 // filtering out peripheral nodes.
 //
 // Wraps gonum/graph/topo.KCore.
-func KCore(k int, g graph.Undirected) []int64 {
+func KCore(ctx context.Context, k int, g graph.Undirected) []int64 {
 	core := topo.KCore(k, g)
 	ids := make([]int64, len(core))
 	for i, n := range core {
@@ -32,7 +34,7 @@ func KCore(k int, g graph.Undirected) []int64 {
 //     len(coreLayers) - 1.
 //
 // Wraps gonum/graph/topo.DegeneracyOrdering.
-func DegeneracyOrdering(g graph.Undirected) (order []int64, coreLayers [][]int64) {
+func DegeneracyOrdering(ctx context.Context, g graph.Undirected) (order []int64, coreLayers [][]int64) {
 	rawOrder, rawCores := topo.DegeneracyOrdering(g)
 	order = make([]int64, len(rawOrder))
 	for i, n := range rawOrder {

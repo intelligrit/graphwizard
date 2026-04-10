@@ -3,8 +3,10 @@
 package community
 
 import (
+	"context"
 	"math"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/mat"
 )
@@ -19,7 +21,7 @@ import (
 //
 // Reference: A. Ng, M. Jordan, Y. Weiss, "On Spectral Clustering: Analysis
 // and an Algorithm", NIPS 2001.
-func SpectralClustering(g graph.Undirected, k int) map[int64]int {
+func SpectralClustering(ctx context.Context, g graph.Undirected, k int) map[int64]int {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -39,6 +41,7 @@ func SpectralClustering(g graph.Undirected, k int) map[int64]int {
 	}
 
 	// Build adjacency matrix and degree.
+	progress.Report(ctx, progress.Progress{Phase: "build", Step: 0, Total: 3})
 	A := mat.NewDense(n, n, nil)
 	deg := make([]float64, n)
 	for i, id := range ids {
@@ -73,6 +76,7 @@ func SpectralClustering(g graph.Undirected, k int) map[int64]int {
 	L := mat.NewSymDense(n, lData)
 
 	// Eigendecomposition.
+	progress.Report(ctx, progress.Progress{Phase: "eigen", Step: 1, Total: 3})
 	var eig mat.EigenSym
 	if !eig.Factorize(L, true) {
 		// Fallback: each node in its own cluster.
@@ -113,6 +117,7 @@ func SpectralClustering(g graph.Undirected, k int) map[int64]int {
 	}
 
 	// K-means clustering on the rows.
+	progress.Report(ctx, progress.Progress{Phase: "cluster", Step: 2, Total: 3})
 	labels := kmeans(embedding, n, k, 100)
 
 	result := make(map[int64]int, n)

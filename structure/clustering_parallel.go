@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"runtime"
 	"sync"
 
@@ -12,7 +13,7 @@ import (
 // ClusteringCoefficientParallel is a concurrent version of
 // ClusteringCoefficient that distributes per-node computation across
 // available CPU cores.
-func ClusteringCoefficientParallel(g graph.Undirected) map[int64]float64 {
+func ClusteringCoefficientParallel(ctx context.Context, g graph.Undirected) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {

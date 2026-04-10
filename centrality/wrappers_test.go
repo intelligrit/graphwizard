@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestPageRank_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := PageRank(g, 0.85, 1e-6)
+	scores := PageRank(context.Background(), g, 0.85, 1e-6)
 	if len(scores) != 3 {
 		t.Fatalf("expected 3 scores, got %d", len(scores))
 	}
@@ -31,7 +32,7 @@ func TestPageRankSparse_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := PageRankSparse(g, 0.85, 1e-6)
+	scores := PageRankSparse(context.Background(), g, 0.85, 1e-6)
 	if len(scores) != 3 {
 		t.Fatalf("expected 3 scores, got %d", len(scores))
 	}
@@ -43,7 +44,7 @@ func TestBetweenness_Star(t *testing.T) {
 		g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(i)))
 	}
 
-	scores := Betweenness(g)
+	scores := Betweenness(context.Background(), g)
 	for i := int64(1); i <= 4; i++ {
 		if scores[0] <= scores[i] {
 			t.Errorf("center should have higher betweenness than leaf %d", i)
@@ -57,7 +58,7 @@ func TestBetweennessWeighted_Chain(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := BetweennessWeighted(g, allPaths)
+	scores := BetweennessWeighted(context.Background(), g, allPaths)
 	if scores[1] <= scores[0] {
 		t.Errorf("node 1 should have higher betweenness than node 0")
 	}
@@ -68,7 +69,7 @@ func TestEdgeBetweenness_Chain(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := EdgeBetweenness(g)
+	scores := EdgeBetweenness(context.Background(), g)
 	if len(scores) == 0 {
 		t.Fatal("expected non-empty edge betweenness")
 	}
@@ -80,7 +81,7 @@ func TestEdgeBetweennessWeighted_Chain(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := EdgeBetweennessWeighted(g, allPaths)
+	scores := EdgeBetweennessWeighted(context.Background(), g, allPaths)
 	if len(scores) == 0 {
 		t.Fatal("expected non-empty edge betweenness")
 	}
@@ -93,7 +94,7 @@ func TestCloseness_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := Closeness(g, allPaths)
+	scores := Closeness(context.Background(), g, allPaths)
 	if len(scores) != 3 {
 		t.Fatalf("expected 3 closeness scores, got %d", len(scores))
 	}
@@ -109,7 +110,7 @@ func TestHarmonic_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := Harmonic(g, allPaths)
+	scores := Harmonic(context.Background(), g, allPaths)
 	if len(scores) != 3 {
 		t.Fatalf("expected 3 harmonic scores, got %d", len(scores))
 	}
@@ -121,7 +122,7 @@ func TestHITS_Star(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 
-	result := HITS(g, 1e-6)
+	result := HITS(context.Background(), g, 1e-6)
 	if result.Authority[0] <= result.Authority[1] {
 		t.Errorf("node 0 should have highest authority")
 	}
@@ -133,7 +134,7 @@ func TestHITS_Star(t *testing.T) {
 func TestInDegree_SingleNode(t *testing.T) {
 	g := simple.NewDirectedGraph()
 	g.AddNode(simple.Node(0))
-	scores := InDegree(g)
+	scores := InDegree(context.Background(), g)
 	if scores[0] != 0 {
 		t.Errorf("expected 0, got %f", scores[0])
 	}
@@ -142,7 +143,7 @@ func TestInDegree_SingleNode(t *testing.T) {
 func TestOutDegree_SingleNode(t *testing.T) {
 	g := simple.NewDirectedGraph()
 	g.AddNode(simple.Node(0))
-	scores := OutDegree(g)
+	scores := OutDegree(context.Background(), g)
 	if scores[0] != 0 {
 		t.Errorf("expected 0, got %f", scores[0])
 	}
@@ -150,7 +151,7 @@ func TestOutDegree_SingleNode(t *testing.T) {
 
 func TestKatzUndirected_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	scores := KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	scores := KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	if len(scores) != 0 {
 		t.Errorf("expected empty map for empty graph, got %v", scores)
 	}

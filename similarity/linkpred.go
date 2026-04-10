@@ -3,9 +3,11 @@
 package similarity
 
 import (
+	"context"
 	"math"
 	"sort"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -20,7 +22,7 @@ type PredictedLink struct {
 // Higher values suggest a higher likelihood of a future connection.
 //
 // CN(u, v) = |N(u) ∩ N(v)|
-func CommonNeighbors(g graph.Undirected, u, v int64) int {
+func CommonNeighbors(ctx context.Context, g graph.Undirected, u, v int64) int {
 	nu := neighborSet(g, u)
 	nv := neighborSet(g, v)
 	count := 0
@@ -40,7 +42,7 @@ func CommonNeighbors(g graph.Undirected, u, v int64) int {
 //
 // Reference: L. Adamic and E. Adar, "Friends and neighbors on the Web",
 // Social Networks, 2003.
-func AdamicAdar(g graph.Undirected, u, v int64) float64 {
+func AdamicAdar(ctx context.Context, g graph.Undirected, u, v int64) float64 {
 	nu := neighborSet(g, u)
 	nv := neighborSet(g, v)
 	score := 0.0
@@ -63,7 +65,7 @@ func AdamicAdar(g graph.Undirected, u, v int64) float64 {
 //
 // Reference: A. Barabasi and R. Albert, "Emergence of Scaling in Random
 // Networks", Science, 1999.
-func PreferentialAttachment(g graph.Undirected, u, v int64) int {
+func PreferentialAttachment(ctx context.Context, g graph.Undirected, u, v int64) int {
 	return degree(g, u) * degree(g, v)
 }
 
@@ -73,7 +75,7 @@ func PreferentialAttachment(g graph.Undirected, u, v int64) int {
 //
 // The scorer function should be one of CommonNeighbors (cast to float64),
 // AdamicAdar, or a custom function with signature func(g, u, v) float64.
-func PredictLinks(g graph.Undirected, k int, scorer func(graph.Undirected, int64, int64) float64) []PredictedLink {
+func PredictLinks(ctx context.Context, g graph.Undirected, k int, scorer func(graph.Undirected, int64, int64) float64) []PredictedLink {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -83,6 +85,7 @@ func PredictLinks(g graph.Undirected, k int, scorer func(graph.Undirected, int64
 
 	var candidates []PredictedLink
 	for i := 0; i < len(ids); i++ {
+		progress.Report(ctx, progress.Progress{Phase: "pairs", Step: i, Total: len(ids)})
 		for j := i + 1; j < len(ids); j++ {
 			u, v := ids[i], ids[j]
 			if g.HasEdgeBetween(u, v) {
@@ -111,7 +114,7 @@ func PredictLinks(g graph.Undirected, k int, scorer func(graph.Undirected, int64
 // Cosine(u, v) = |N(u) ∩ N(v)| / sqrt(|N(u)| * |N(v)|)
 //
 // Returns 0 if either node has no neighbors.
-func Cosine(g graph.Undirected, u, v int64) float64 {
+func Cosine(ctx context.Context, g graph.Undirected, u, v int64) float64 {
 	nu := neighborSet(g, u)
 	nv := neighborSet(g, v)
 	if len(nu) == 0 || len(nv) == 0 {

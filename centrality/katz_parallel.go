@@ -3,11 +3,13 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"runtime"
 	"sync"
 
 	"github.com/intelligrit/graphwizard"
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -16,7 +18,7 @@ import (
 // across available CPU cores.
 //
 // Parameters and semantics are identical to Katz.
-func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func KatzParallel(ctx context.Context, g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -50,6 +52,7 @@ func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[i
 	x := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		xNew := make([]float64, n)
 
 		var wg sync.WaitGroup
@@ -92,12 +95,12 @@ func KatzParallel(g graph.Directed, alpha, beta, tol float64, maxIter int) map[i
 
 // KatzUndirectedParallel returns the Katz centrality for each node in an
 // undirected graph, with power iteration parallelized.
-func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func KatzUndirectedParallel(ctx context.Context, g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	// Fast path: use precomputed dense adjacency when available.
 	// NodeIDs() returns nil when the backing store hasn't been preloaded,
 	// so check that the dense structure is actually populated.
 	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
-		return katzUndirectedParallelDense(da, alpha, beta, tol, maxIter)
+		return katzUndirectedParallelDense(ctx, da, alpha, beta, tol, maxIter)
 	}
 
 	nodes := g.Nodes()
@@ -133,6 +136,7 @@ func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIte
 	x := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		xNew := make([]float64, n)
 
 		var wg sync.WaitGroup
@@ -173,7 +177,7 @@ func KatzUndirectedParallel(g graph.Undirected, alpha, beta, tol float64, maxIte
 	return result
 }
 
-func katzUndirectedParallelDense(da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func katzUndirectedParallelDense(ctx context.Context, da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	ids := da.NodeIDs()
 	n := da.NumNodes()
 	if n == 0 {
@@ -185,6 +189,7 @@ func katzUndirectedParallelDense(da graphwizard.DenseAdjacency, alpha, beta, tol
 	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		for i := range xNew {
 			xNew[i] = 0
 		}

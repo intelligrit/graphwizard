@@ -3,6 +3,7 @@
 package connectivity_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/intelligrit/graphwizard/connectivity"
@@ -16,7 +17,7 @@ func ExampleBridges() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3))) // bridge
 
-	bridges := connectivity.Bridges(g)
+	bridges := connectivity.Bridges(context.Background(), g)
 	fmt.Printf("bridges: %d\n", len(bridges))
 	// Output: bridges: 1
 }
@@ -26,7 +27,7 @@ func ExampleConnectedComponents() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	comps := connectivity.ConnectedComponents(g)
+	comps := connectivity.ConnectedComponents(context.Background(), g)
 	fmt.Printf("components: %d\n", len(comps))
 	// Output: components: 2
 }
@@ -37,7 +38,7 @@ func ExampleCondensation() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	comps, edges, _ := connectivity.Condensation(g)
+	comps, edges, _ := connectivity.Condensation(context.Background(), g)
 	fmt.Printf("SCCs: %d, DAG edges: %d\n", len(comps), len(edges))
 	// Output: SCCs: 2, DAG edges: 1
 }
@@ -49,7 +50,7 @@ func ExampleKCore() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3))) // pendant
 
-	core := connectivity.KCore(2, g)
+	core := connectivity.KCore(context.Background(), 2, g)
 	fmt.Printf("2-core size: %d\n", len(core))
 	// Output: 2-core size: 3
 }
@@ -71,7 +72,7 @@ func ExampleArticulationPoints() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	aps := connectivity.ArticulationPoints(g)
+	aps := connectivity.ArticulationPoints(context.Background(), g)
 	fmt.Printf("cut vertices: %d\n", len(aps))
 	// Output: cut vertices: 1
 }
@@ -81,7 +82,7 @@ func ExampleTopologicalSort() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	order, ok := connectivity.TopologicalSort(g)
+	order, ok := connectivity.TopologicalSort(context.Background(), g)
 	fmt.Printf("ok: %v, first: %d\n", ok, order[0])
 	// Output: ok: true, first: 0
 }
@@ -92,7 +93,7 @@ func ExampleStronglyConnectedComponents() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	comps := connectivity.StronglyConnectedComponents(g)
+	comps := connectivity.StronglyConnectedComponents(context.Background(), g)
 	fmt.Printf("SCCs: %d\n", len(comps))
 	// Output: SCCs: 3
 }
@@ -103,7 +104,7 @@ func ExampleDegeneracyOrdering() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	order, layers := connectivity.DegeneracyOrdering(g)
+	order, layers := connectivity.DegeneracyOrdering(context.Background(), g)
 	fmt.Printf("nodes: %d, layers: %d\n", len(order), len(layers))
 	// Output: nodes: 3, layers: 3
 }
@@ -118,7 +119,7 @@ func ExampleBridgesParallel() {
 	// Component 2: disconnected pair.
 	g.SetEdge(g.NewEdge(simple.Node(10), simple.Node(11))) // bridge
 
-	bridges := connectivity.BridgesParallel(g)
+	bridges := connectivity.BridgesParallel(context.Background(), g)
 	fmt.Printf("bridges: %d\n", len(bridges))
 	// Output: bridges: 2
 }
@@ -129,7 +130,7 @@ func ExampleDirectedCycles() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	cycles := connectivity.DirectedCycles(g)
+	cycles := connectivity.DirectedCycles(context.Background(), g)
 	fmt.Printf("cycles: %d\n", len(cycles))
 	// Output: cycles: 1
 }
@@ -140,7 +141,7 @@ func ExampleUndirectedCycles() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	cycles := connectivity.UndirectedCycles(g)
+	cycles := connectivity.UndirectedCycles(context.Background(), g)
 	fmt.Printf("cycle basis size: %d\n", len(cycles))
 	// Output: cycle basis size: 1
 }
@@ -164,7 +165,7 @@ func ExampleBiconnectedComponents() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
 
-	comps := connectivity.BiconnectedComponents(g)
+	comps := connectivity.BiconnectedComponents(context.Background(), g)
 	fmt.Printf("biconnected components: %d\n", len(comps))
 	// Output: biconnected components: 2
 }

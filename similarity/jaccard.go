@@ -3,6 +3,9 @@
 package similarity
 
 import (
+	"context"
+
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -18,7 +21,7 @@ type NodePairScore struct {
 //	J(u, v) = |N(u) ∩ N(v)| / |N(u) ∪ N(v)|
 //
 // Returns 0 if both nodes have no neighbors.
-func Jaccard(g graph.Undirected, u, v int64) float64 {
+func Jaccard(ctx context.Context, g graph.Undirected, u, v int64) float64 {
 	nu := neighborSet(g, u)
 	nv := neighborSet(g, v)
 
@@ -40,7 +43,7 @@ func Jaccard(g graph.Undirected, u, v int64) float64 {
 // JaccardAll returns all node pairs with Jaccard similarity at or above the
 // given threshold. Only pairs where A.ID() < B.ID() are returned to avoid
 // duplicates.
-func JaccardAll(g graph.Undirected, threshold float64) []NodePairScore {
+func JaccardAll(ctx context.Context, g graph.Undirected, threshold float64) []NodePairScore {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -49,8 +52,9 @@ func JaccardAll(g graph.Undirected, threshold float64) []NodePairScore {
 
 	var results []NodePairScore
 	for i := 0; i < len(ids); i++ {
+		progress.Report(ctx, progress.Progress{Phase: "pairs", Step: i, Total: len(ids)})
 		for j := i + 1; j < len(ids); j++ {
-			score := Jaccard(g, ids[i], ids[j])
+			score := Jaccard(ctx, g, ids[i], ids[j])
 			if score >= threshold {
 				results = append(results, NodePairScore{
 					A:     g.Node(ids[i]),
@@ -69,7 +73,7 @@ func JaccardAll(g graph.Undirected, threshold float64) []NodePairScore {
 //	O(u, v) = |N(u) ∩ N(v)| / min(|N(u)|, |N(v)|)
 //
 // Returns 0 if either node has no neighbors.
-func Overlap(g graph.Undirected, u, v int64) float64 {
+func Overlap(ctx context.Context, g graph.Undirected, u, v int64) float64 {
 	nu := neighborSet(g, u)
 	nv := neighborSet(g, v)
 

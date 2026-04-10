@@ -3,6 +3,8 @@
 package structure
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/coloring"
 )
@@ -12,7 +14,7 @@ import (
 // (0-based), and k is the chromatic number (minimum colors needed).
 //
 // Wraps gonum/graph/coloring.DsaturExact.
-func GraphColoring(g graph.Undirected) (map[int64]int, int, error) {
+func GraphColoring(ctx context.Context, g graph.Undirected) (map[int64]int, int, error) {
 	k, colors, err := coloring.DsaturExact(nil, g)
 	return colors, k, err
 }

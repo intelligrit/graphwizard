@@ -3,8 +3,10 @@
 package structure
 
 import (
+	"context"
 	"math"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -26,7 +28,7 @@ type TSPResult struct {
 //
 // Reference: G. Croes, "A Method for Solving Traveling-Salesman Problems",
 // Operations Research, 1958. (2-opt)
-func TSP(g graph.WeightedUndirected) TSPResult {
+func TSP(ctx context.Context, g graph.WeightedUndirected) TSPResult {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -65,6 +67,7 @@ func TSP(g graph.WeightedUndirected) TSPResult {
 	}
 
 	// Nearest-neighbor heuristic starting from each node; keep best.
+	progress.Report(ctx, progress.Progress{Phase: "nn-heuristic", Step: 0, Total: 2})
 	bestTour := nearestNeighbor(dist, n, 0)
 	bestCost := tourCost(dist, bestTour)
 	for start := 1; start < n; start++ {
@@ -77,6 +80,7 @@ func TSP(g graph.WeightedUndirected) TSPResult {
 	}
 
 	// 2-opt improvement.
+	progress.Report(ctx, progress.Progress{Phase: "2opt", Step: 1, Total: 2})
 	bestTour, bestCost = twoOpt(dist, bestTour, bestCost)
 
 	// Convert to nodes.

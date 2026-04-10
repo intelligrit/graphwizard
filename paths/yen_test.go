@@ -3,6 +3,7 @@
 package paths
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestYenKShortest_Diamond(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(3), 3))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(3), 1))
 
-	paths := YenKShortest(g, 0, 3, 3)
+	paths := YenKShortest(context.Background(), g, 0, 3, 3)
 	if len(paths) != 2 {
 		t.Fatalf("expected 2 paths, got %d", len(paths))
 	}
@@ -39,7 +40,7 @@ func TestYenKShortest_Chain(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 1))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 
-	paths := YenKShortest(g, 0, 2, 5)
+	paths := YenKShortest(context.Background(), g, 0, 2, 5)
 	if len(paths) != 1 {
 		t.Fatalf("expected 1 path, got %d", len(paths))
 	}
@@ -53,7 +54,7 @@ func TestYenKShortest_NoPath(t *testing.T) {
 	g.AddNode(simple.Node(0))
 	g.AddNode(simple.Node(1))
 
-	paths := YenKShortest(g, 0, 1, 3)
+	paths := YenKShortest(context.Background(), g, 0, 1, 3)
 	if len(paths) != 0 {
 		t.Fatalf("expected 0 paths, got %d", len(paths))
 	}
@@ -69,7 +70,7 @@ func TestYenKShortest_MultipleParallel(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(3), 2))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(3), 5))
 
-	paths := YenKShortest(g, 0, 3, 3)
+	paths := YenKShortest(context.Background(), g, 0, 3, 3)
 	if len(paths) != 3 {
 		t.Fatalf("expected 3 paths, got %d", len(paths))
 	}

@@ -3,6 +3,7 @@
 package centrality_test
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -19,7 +20,7 @@ func ExamplePageRank() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := centrality.PageRank(g, 0.85, 1e-6)
+	scores := centrality.PageRank(context.Background(), g, 0.85, 1e-6)
 	fmt.Printf("%.4f\n", scores[0])
 	// Output: 0.3333
 }
@@ -31,7 +32,7 @@ func ExampleBetweenness() {
 		g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(i)))
 	}
 
-	scores := centrality.Betweenness(g)
+	scores := centrality.Betweenness(context.Background(), g)
 	fmt.Printf("center=%.1f leaf=%.1f\n", scores[0], scores[1])
 	// Output: center=6.0 leaf=0.0
 }
@@ -42,7 +43,7 @@ func ExampleCloseness() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := centrality.Closeness(g, allPaths)
+	scores := centrality.Closeness(context.Background(), g, allPaths)
 	fmt.Printf("center=%.4f endpoint=%.4f\n", scores[1], scores[0])
 	// Output: center=0.5000 endpoint=0.3333
 }
@@ -52,7 +53,7 @@ func ExampleDegree() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 
-	scores := centrality.Degree(g)
+	scores := centrality.Degree(context.Background(), g)
 	fmt.Printf("hub=%.2f leaf=%.2f\n", scores[0], scores[1])
 	// Output: hub=1.00 leaf=0.50
 }
@@ -62,7 +63,7 @@ func ExampleKatz() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.Katz(g, 0.1, 1.0, 1e-8, 100)
+	scores := centrality.Katz(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	fmt.Printf("node2 > node0: %v\n", scores[2] > scores[0])
 	// Output: node2 > node0: true
 }
@@ -74,7 +75,7 @@ func ExamplePersonalizedPageRank() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(1)))
 
-	scores := centrality.PersonalizedPageRank(g, 0, 0.85, 1e-6, 100)
+	scores := centrality.PersonalizedPageRank(context.Background(), g, 0, 0.85, 1e-6, 100)
 	fmt.Printf("seed highest: %v\n", scores[0] > scores[2])
 	// Output: seed highest: true
 }
@@ -84,7 +85,7 @@ func ExampleDiameter() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	d := centrality.Diameter(g)
+	d := centrality.Diameter(context.Background(), g)
 	fmt.Printf("diameter=%.0f\n", d)
 	// Output: diameter=2
 }
@@ -94,7 +95,7 @@ func ExampleRadius() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	r := centrality.Radius(g)
+	r := centrality.Radius(context.Background(), g)
 	fmt.Printf("radius=%.0f\n", r)
 	// Output: radius=1
 }
@@ -104,7 +105,7 @@ func ExampleHITS() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	result := centrality.HITS(g, 1e-6)
+	result := centrality.HITS(context.Background(), g, 1e-6)
 	fmt.Printf("node0 is authority: %v\n", result.Authority[0] > result.Authority[1])
 	// Output: node0 is authority: true
 }
@@ -114,7 +115,7 @@ func ExampleEccentricity() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	ecc := centrality.Eccentricity(g)
+	ecc := centrality.Eccentricity(context.Background(), g)
 	fmt.Printf("center ecc=%.0f, endpoint ecc=%.0f\n", ecc[1], ecc[0])
 	// Output: center ecc=1, endpoint ecc=2
 }
@@ -126,7 +127,7 @@ func ExampleInfluenceMaximization() {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	seeds, influence := centrality.InfluenceMaximization(g, 1, 0.5, 200, rng)
+	seeds, influence := centrality.InfluenceMaximization(context.Background(), g, 1, 0.5, 200, rng)
 	fmt.Printf("seed: %d, influence>1: %v\n", seeds[0], influence > 1.0)
 	// Output: seed: 0, influence>1: true
 }
@@ -136,7 +137,7 @@ func ExamplePersonalizedPageRankUndirected() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.PersonalizedPageRankUndirected(g, 0, 0.85, 1e-6, 100)
+	scores := centrality.PersonalizedPageRankUndirected(context.Background(), g, 0, 0.85, 1e-6, 100)
 	fmt.Printf("seed > far: %v\n", scores[0] > scores[2])
 	// Output: seed > far: true
 }
@@ -146,7 +147,7 @@ func ExampleInDegree() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(1)))
 
-	scores := centrality.InDegree(g)
+	scores := centrality.InDegree(context.Background(), g)
 	fmt.Printf("node1=%.2f\n", scores[1])
 	// Output: node1=1.00
 }
@@ -156,7 +157,7 @@ func ExampleOutDegree() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 
-	scores := centrality.OutDegree(g)
+	scores := centrality.OutDegree(context.Background(), g)
 	fmt.Printf("node0=%.2f\n", scores[0])
 	// Output: node0=1.00
 }
@@ -168,7 +169,7 @@ func ExampleApproximateBetweenness() {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	scores := centrality.ApproximateBetweenness(g, 5, rng)
+	scores := centrality.ApproximateBetweenness(context.Background(), g, 5, rng)
 	fmt.Printf("center highest: %v\n", scores[0] > scores[1])
 	// Output: center highest: true
 }
@@ -178,7 +179,7 @@ func ExampleEccentricityParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	ecc := centrality.EccentricityParallel(g)
+	ecc := centrality.EccentricityParallel(context.Background(), g)
 	fmt.Printf("endpoint=%.0f center=%.0f\n", ecc[0], ecc[1])
 	// Output: endpoint=2 center=1
 }
@@ -188,7 +189,7 @@ func ExampleDiameterParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	d := centrality.DiameterParallel(g)
+	d := centrality.DiameterParallel(context.Background(), g)
 	fmt.Printf("diameter=%.0f\n", d)
 	// Output: diameter=2
 }
@@ -200,7 +201,7 @@ func ExampleBetweennessWeighted() {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(2), 10))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := centrality.BetweennessWeighted(g, allPaths)
+	scores := centrality.BetweennessWeighted(context.Background(), g, allPaths)
 	fmt.Printf("center=%.1f endpoint=%.1f\n", scores[1], scores[0])
 	// Output: center=2.0 endpoint=0.0
 }
@@ -210,7 +211,7 @@ func ExampleEdgeBetweenness() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.EdgeBetweenness(g)
+	scores := centrality.EdgeBetweenness(context.Background(), g)
 	fmt.Printf("pairs: %d\n", len(scores))
 	// Output: pairs: 2
 }
@@ -221,7 +222,7 @@ func ExampleEdgeBetweennessWeighted() {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := centrality.EdgeBetweennessWeighted(g, allPaths)
+	scores := centrality.EdgeBetweennessWeighted(context.Background(), g, allPaths)
 	fmt.Printf("pairs: %d\n", len(scores))
 	// Output: pairs: 2
 }
@@ -232,7 +233,7 @@ func ExampleHarmonic() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	allPaths := path.DijkstraAllPaths(g)
-	scores := centrality.Harmonic(g, allPaths)
+	scores := centrality.Harmonic(context.Background(), g, allPaths)
 	fmt.Printf("center=%.4f endpoint=%.4f\n", scores[1], scores[0])
 	// Output: center=2.0000 endpoint=1.5000
 }
@@ -242,7 +243,7 @@ func ExampleKatzParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.KatzParallel(g, 0.1, 1.0, 1e-8, 100)
+	scores := centrality.KatzParallel(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	fmt.Printf("node2 > node0: %v\n", scores[2] > scores[0])
 	// Output: node2 > node0: true
 }
@@ -252,7 +253,7 @@ func ExampleKatzUndirected() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	scores := centrality.KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	fmt.Printf("center highest: %v\n", scores[1] >= scores[0])
 	// Output: center highest: true
 }
@@ -262,7 +263,7 @@ func ExampleKatzUndirectedParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := centrality.KatzUndirectedParallel(g, 0.1, 1.0, 1e-8, 100)
+	scores := centrality.KatzUndirectedParallel(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	fmt.Printf("center highest: %v\n", scores[1] >= scores[0])
 	// Output: center highest: true
 }
@@ -273,7 +274,7 @@ func ExamplePageRankSparse() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := centrality.PageRankSparse(g, 0.85, 1e-6)
+	scores := centrality.PageRankSparse(context.Background(), g, 0.85, 1e-6)
 	fmt.Printf("%.4f\n", scores[0])
 	// Output: 0.3333
 }

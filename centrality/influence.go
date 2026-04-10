@@ -3,8 +3,10 @@
 package centrality
 
 import (
+	"context"
 	"math/rand"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -24,7 +26,7 @@ import (
 // Networks", KDD 2007 (CELF optimization). D. Kempe, J. Kleinberg,
 // E. Tardos, "Maximizing the Spread of Influence through a Social Network",
 // KDD 2003 (influence maximization).
-func InfluenceMaximization(g graph.Undirected, k int, probability float64, simulations int, rng *rand.Rand) (seeds []int64, influence float64) {
+func InfluenceMaximization(ctx context.Context, g graph.Undirected, k int, probability float64, simulations int, rng *rand.Rand) (seeds []int64, influence float64) {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -59,6 +61,7 @@ func InfluenceMaximization(g graph.Undirected, k int, probability float64, simul
 	}
 
 	for round := 0; round < k; round++ {
+		progress.Report(ctx, progress.Progress{Phase: "select", Step: round, Total: k})
 		// Sort by marginal gain descending.
 		sortCandidates(cands)
 

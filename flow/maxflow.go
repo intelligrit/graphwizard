@@ -3,6 +3,8 @@
 package flow
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/network"
 )
@@ -12,6 +14,6 @@ import (
 // for considering flow as zero.
 //
 // Wraps gonum/graph/network.MaxFlowDinic.
-func MaxFlow(g graph.WeightedDirected, source, target int64, eps float64) float64 {
+func MaxFlow(ctx context.Context, g graph.WeightedDirected, source, target int64, eps float64) float64 {
 	return network.MaxFlowDinic(g, g.Node(source), g.Node(target), eps)
 }

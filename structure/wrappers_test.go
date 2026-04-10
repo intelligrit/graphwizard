@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -14,7 +15,7 @@ func TestMaximalCliques_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	cliques := MaximalCliques(g)
+	cliques := MaximalCliques(context.Background(), g)
 	if len(cliques) != 1 {
 		t.Fatalf("expected 1 maximal clique in triangle, got %d", len(cliques))
 	}
@@ -28,7 +29,7 @@ func TestMaximalCliques_Path(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	cliques := MaximalCliques(g)
+	cliques := MaximalCliques(context.Background(), g)
 	// Path has 2 maximal cliques: {0,1} and {1,2}.
 	if len(cliques) != 2 {
 		t.Fatalf("expected 2 maximal cliques in path, got %d", len(cliques))
@@ -41,7 +42,7 @@ func TestGraphColoring_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	colors, k, err := GraphColoring(g)
+	colors, k, err := GraphColoring(context.Background(), g)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +63,7 @@ func TestGraphColoring_Bipartite(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
 
-	_, k, err := GraphColoring(g)
+	_, k, err := GraphColoring(context.Background(), g)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestGraphColoring_Bipartite(t *testing.T) {
 
 func TestAverageClusteringCoefficient_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	avg := AverageClusteringCoefficient(g)
+	avg := AverageClusteringCoefficient(context.Background(), g)
 	if avg != 0 {
 		t.Errorf("expected 0 for empty graph, got %f", avg)
 	}

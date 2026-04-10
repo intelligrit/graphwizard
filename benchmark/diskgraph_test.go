@@ -3,6 +3,7 @@
 package benchmark
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"testing"
@@ -52,7 +53,7 @@ func TestDiskKarate_GraphStructure(t *testing.T) {
 
 func TestDiskKarate_Degree(t *testing.T) {
 	memG := KarateClub()
-	memScores := centrality.Degree(memG)
+	memScores := centrality.Degree(context.Background(), memG)
 
 	dir, cleanup := diskTempDir("deg")
 	defer cleanup()
@@ -62,13 +63,13 @@ func TestDiskKarate_Degree(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskScores := centrality.Degree(diskG)
+	diskScores := centrality.Degree(context.Background(), diskG)
 	compareMaps(t, "Degree", memScores, diskScores)
 }
 
 func TestDiskKarate_Betweenness(t *testing.T) {
 	memG := KarateClub()
-	memScores := centrality.Betweenness(memG)
+	memScores := centrality.Betweenness(context.Background(), memG)
 
 	dir, cleanup := diskTempDir("btw")
 	defer cleanup()
@@ -78,13 +79,13 @@ func TestDiskKarate_Betweenness(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskScores := centrality.Betweenness(diskG)
+	diskScores := centrality.Betweenness(context.Background(), diskG)
 	compareMaps(t, "Betweenness", memScores, diskScores)
 }
 
 func TestDiskKarate_Eccentricity(t *testing.T) {
 	memG := KarateClub()
-	memScores := centrality.Eccentricity(memG)
+	memScores := centrality.Eccentricity(context.Background(), memG)
 
 	dir, cleanup := diskTempDir("ecc")
 	defer cleanup()
@@ -94,12 +95,12 @@ func TestDiskKarate_Eccentricity(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskScores := centrality.Eccentricity(diskG)
+	diskScores := centrality.Eccentricity(context.Background(), diskG)
 	compareMaps(t, "Eccentricity", memScores, diskScores)
 }
 
 func TestDiskKarate_Diameter(t *testing.T) {
-	memD := centrality.Diameter(KarateClub())
+	memD := centrality.Diameter(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("dia")
 	defer cleanup()
@@ -109,14 +110,14 @@ func TestDiskKarate_Diameter(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskD := centrality.Diameter(diskG)
+	diskD := centrality.Diameter(context.Background(), diskG)
 	if memD != diskD {
 		t.Errorf("Diameter: mem=%.0f disk=%.0f", memD, diskD)
 	}
 }
 
 func TestDiskKarate_TriangleCount(t *testing.T) {
-	_, memTotal := structure.TriangleCount(KarateClub())
+	_, memTotal := structure.TriangleCount(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("tri")
 	defer cleanup()
@@ -126,14 +127,14 @@ func TestDiskKarate_TriangleCount(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	_, diskTotal := structure.TriangleCount(diskG)
+	_, diskTotal := structure.TriangleCount(context.Background(), diskG)
 	if memTotal != diskTotal {
 		t.Errorf("TriangleCount: mem=%d disk=%d", memTotal, diskTotal)
 	}
 }
 
 func TestDiskKarate_ClusteringCoefficient(t *testing.T) {
-	memCC := structure.ClusteringCoefficient(KarateClub())
+	memCC := structure.ClusteringCoefficient(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("cc")
 	defer cleanup()
@@ -143,12 +144,12 @@ func TestDiskKarate_ClusteringCoefficient(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskCC := structure.ClusteringCoefficient(diskG)
+	diskCC := structure.ClusteringCoefficient(context.Background(), diskG)
 	compareMaps(t, "ClusteringCoefficient", memCC, diskCC)
 }
 
 func TestDiskKarate_AverageClusteringCoefficient(t *testing.T) {
-	memAvg := structure.AverageClusteringCoefficient(KarateClub())
+	memAvg := structure.AverageClusteringCoefficient(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("avgcc")
 	defer cleanup()
@@ -158,14 +159,14 @@ func TestDiskKarate_AverageClusteringCoefficient(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskAvg := structure.AverageClusteringCoefficient(diskG)
+	diskAvg := structure.AverageClusteringCoefficient(context.Background(), diskG)
 	if math.Abs(memAvg-diskAvg) > 1e-9 {
 		t.Errorf("AvgCC: mem=%.6f disk=%.6f", memAvg, diskAvg)
 	}
 }
 
 func TestDiskKarate_Bridges(t *testing.T) {
-	memBridges := connectivity.Bridges(KarateClub())
+	memBridges := connectivity.Bridges(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("br")
 	defer cleanup()
@@ -175,14 +176,14 @@ func TestDiskKarate_Bridges(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskBridges := connectivity.Bridges(diskG)
+	diskBridges := connectivity.Bridges(context.Background(), diskG)
 	if len(memBridges) != len(diskBridges) {
 		t.Errorf("Bridges: mem=%d disk=%d", len(memBridges), len(diskBridges))
 	}
 }
 
 func TestDiskKarate_ConnectedComponents(t *testing.T) {
-	memComps := connectivity.ConnectedComponents(KarateClub())
+	memComps := connectivity.ConnectedComponents(context.Background(), KarateClub())
 
 	dir, cleanup := diskTempDir("wcc")
 	defer cleanup()
@@ -192,14 +193,14 @@ func TestDiskKarate_ConnectedComponents(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskComps := connectivity.ConnectedComponents(diskG)
+	diskComps := connectivity.ConnectedComponents(context.Background(), diskG)
 	if len(memComps) != len(diskComps) {
 		t.Errorf("ConnectedComponents: mem=%d disk=%d", len(memComps), len(diskComps))
 	}
 }
 
 func TestDiskKarate_KCore(t *testing.T) {
-	memCore := connectivity.KCore(3, KarateClub())
+	memCore := connectivity.KCore(context.Background(), 3, KarateClub())
 
 	dir, cleanup := diskTempDir("kc")
 	defer cleanup()
@@ -209,14 +210,14 @@ func TestDiskKarate_KCore(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskCore := connectivity.KCore(3, diskG)
+	diskCore := connectivity.KCore(context.Background(), 3, diskG)
 	if len(memCore) != len(diskCore) {
 		t.Errorf("KCore: mem=%d disk=%d", len(memCore), len(diskCore))
 	}
 }
 
 func TestDiskKarate_BFS(t *testing.T) {
-	memVisited := traverse.BFS(KarateClub(), 0)
+	memVisited := traverse.BFS(context.Background(), KarateClub(), 0)
 
 	dir, cleanup := diskTempDir("bfs")
 	defer cleanup()
@@ -226,14 +227,14 @@ func TestDiskKarate_BFS(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskVisited := traverse.BFS(diskG, 0)
+	diskVisited := traverse.BFS(context.Background(), diskG, 0)
 	if len(memVisited) != len(diskVisited) {
 		t.Errorf("BFS: mem=%d disk=%d", len(memVisited), len(diskVisited))
 	}
 }
 
 func TestDiskKarate_DFS(t *testing.T) {
-	memVisited := traverse.DFS(KarateClub(), 0)
+	memVisited := traverse.DFS(context.Background(), KarateClub(), 0)
 
 	dir, cleanup := diskTempDir("dfs")
 	defer cleanup()
@@ -243,14 +244,14 @@ func TestDiskKarate_DFS(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskVisited := traverse.DFS(diskG, 0)
+	diskVisited := traverse.DFS(context.Background(), diskG, 0)
 	if len(memVisited) != len(diskVisited) {
 		t.Errorf("DFS: mem=%d disk=%d", len(memVisited), len(diskVisited))
 	}
 }
 
 func TestDiskKarate_Jaccard(t *testing.T) {
-	memJ := similarity.Jaccard(KarateClub(), 0, 1)
+	memJ := similarity.Jaccard(context.Background(), KarateClub(), 0, 1)
 
 	dir, cleanup := diskTempDir("jac")
 	defer cleanup()
@@ -260,7 +261,7 @@ func TestDiskKarate_Jaccard(t *testing.T) {
 	}
 	defer diskG.Close()
 
-	diskJ := similarity.Jaccard(diskG, 0, 1)
+	diskJ := similarity.Jaccard(context.Background(), diskG, 0, 1)
 	if math.Abs(memJ-diskJ) > 1e-9 {
 		t.Errorf("Jaccard(0,1): mem=%.6f disk=%.6f", memJ, diskJ)
 	}
@@ -284,7 +285,7 @@ func TestDiskKarate_DegreeZScore(t *testing.T) {
 func TestDiskKarate_Leiden(t *testing.T) {
 	memG := KarateClub()
 	rng1 := rand.New(rand.NewSource(42))
-	memComms := community.Leiden(memG, 1.0, rng1)
+	memComms := community.Leiden(context.Background(), memG, 1.0, rng1)
 
 	dir, cleanup := diskTempDir("lei")
 	defer cleanup()
@@ -295,7 +296,7 @@ func TestDiskKarate_Leiden(t *testing.T) {
 	defer diskG.Close()
 
 	rng2 := rand.New(rand.NewSource(42))
-	diskComms := community.Leiden(diskG, 1.0, rng2)
+	diskComms := community.Leiden(context.Background(), diskG, 1.0, rng2)
 
 	// Community labels may differ, but the number of communities should match.
 	memLabels := uniqueLabels(memComms)
@@ -319,7 +320,7 @@ func TestDiskKarate_LabelPropagation(t *testing.T) {
 	defer diskG.Close()
 
 	rng := rand.New(rand.NewSource(42))
-	comms := community.LabelPropagation(diskG, 100, rng)
+	comms := community.LabelPropagation(context.Background(), diskG, 100, rng)
 	labels := uniqueLabels(comms)
 	if len(labels) < 2 {
 		t.Error("LabelPropagation on disk graph should detect at least 2 communities")
@@ -340,7 +341,7 @@ func TestDiskScale_Degree_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	scores := centrality.Degree(g)
+	scores := centrality.Degree(context.Background(), g)
 	if len(scores) != 1000 {
 		t.Errorf("expected 1000 scores, got %d", len(scores))
 	}
@@ -356,7 +357,7 @@ func TestDiskScale_BFS_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	visited := traverse.BFS(g, 0)
+	visited := traverse.BFS(context.Background(), g, 0)
 	if len(visited) != 1000 {
 		t.Errorf("BFS should reach all 1K nodes, reached %d", len(visited))
 	}
@@ -372,7 +373,7 @@ func TestDiskScale_Bridges_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	bridges := connectivity.Bridges(g)
+	bridges := connectivity.Bridges(context.Background(), g)
 	t.Logf("1K disk BA graph: %d bridges", len(bridges))
 }
 
@@ -386,7 +387,7 @@ func TestDiskScale_TriangleCount_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	_, total := structure.TriangleCount(g)
+	_, total := structure.TriangleCount(context.Background(), g)
 	t.Logf("1K disk BA(m=5): %d triangles", total)
 	if total == 0 {
 		t.Error("should have triangles")
@@ -403,7 +404,7 @@ func TestDiskScale_WCC_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	comps := connectivity.ConnectedComponents(g)
+	comps := connectivity.ConnectedComponents(context.Background(), g)
 	if len(comps) != 1 {
 		t.Errorf("BA graph should be connected, got %d components", len(comps))
 	}
@@ -420,7 +421,7 @@ func TestDiskScale_Leiden_1K(t *testing.T) {
 	defer g.Close()
 
 	rng2 := rand.New(rand.NewSource(42))
-	comms := community.Leiden(g, 1.0, rng2)
+	comms := community.Leiden(context.Background(), g, 1.0, rng2)
 	labels := uniqueLabels(comms)
 	t.Logf("1K disk two-cluster: %d communities", len(labels))
 	if len(labels) < 2 {
@@ -438,7 +439,7 @@ func TestDiskScale_ClusteringCoefficient_1K(t *testing.T) {
 	}
 	defer g.Close()
 
-	avg := structure.AverageClusteringCoefficient(g)
+	avg := structure.AverageClusteringCoefficient(context.Background(), g)
 	t.Logf("1K disk BA(m=3) avg CC: %.4f", avg)
 	if avg == 0 {
 		t.Error("should have non-zero clustering")
@@ -456,7 +457,7 @@ func BenchmarkDegree_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Degree(g)
+		centrality.Degree(context.Background(), g)
 	}
 }
 
@@ -471,7 +472,7 @@ func BenchmarkDegree_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Degree(g)
+		centrality.Degree(context.Background(), g)
 	}
 }
 
@@ -482,7 +483,7 @@ func BenchmarkBetweenness_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Betweenness(g)
+		centrality.Betweenness(context.Background(), g)
 	}
 }
 
@@ -497,7 +498,7 @@ func BenchmarkBetweenness_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Betweenness(g)
+		centrality.Betweenness(context.Background(), g)
 	}
 }
 
@@ -508,7 +509,7 @@ func BenchmarkBFS_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.BFS(g, 0)
+		traverse.BFS(context.Background(), g, 0)
 	}
 }
 
@@ -523,7 +524,7 @@ func BenchmarkBFS_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.BFS(g, 0)
+		traverse.BFS(context.Background(), g, 0)
 	}
 }
 
@@ -534,7 +535,7 @@ func BenchmarkTriangleCount_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 5, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCount(g)
+		structure.TriangleCount(context.Background(), g)
 	}
 }
 
@@ -549,7 +550,7 @@ func BenchmarkTriangleCount_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCount(g)
+		structure.TriangleCount(context.Background(), g)
 	}
 }
 
@@ -560,7 +561,7 @@ func BenchmarkClusteringCoeff_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficient(g)
+		structure.ClusteringCoefficient(context.Background(), g)
 	}
 }
 
@@ -575,7 +576,7 @@ func BenchmarkClusteringCoeff_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficient(g)
+		structure.ClusteringCoefficient(context.Background(), g)
 	}
 }
 
@@ -591,7 +592,7 @@ func BenchmarkClusteringCoeff_DiskPreload_1K(b *testing.B) {
 	g.PreloadAdjacency()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficient(g)
+		structure.ClusteringCoefficient(context.Background(), g)
 	}
 }
 
@@ -602,7 +603,7 @@ func BenchmarkBridges_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.Bridges(g)
+		connectivity.Bridges(context.Background(), g)
 	}
 }
 
@@ -617,7 +618,7 @@ func BenchmarkBridges_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.Bridges(g)
+		connectivity.Bridges(context.Background(), g)
 	}
 }
 
@@ -628,7 +629,7 @@ func BenchmarkWCC_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.ConnectedComponents(g)
+		connectivity.ConnectedComponents(context.Background(), g)
 	}
 }
 
@@ -643,7 +644,7 @@ func BenchmarkWCC_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.ConnectedComponents(g)
+		connectivity.ConnectedComponents(context.Background(), g)
 	}
 }
 
@@ -654,7 +655,7 @@ func BenchmarkLeiden_Memory_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Leiden(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.Leiden(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -669,7 +670,7 @@ func BenchmarkLeiden_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Leiden(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.Leiden(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -680,7 +681,7 @@ func BenchmarkJaccard_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Jaccard(g, 0, 1)
+		similarity.Jaccard(context.Background(), g, 0, 1)
 	}
 }
 
@@ -695,7 +696,7 @@ func BenchmarkJaccard_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Jaccard(g, 0, 1)
+		similarity.Jaccard(context.Background(), g, 0, 1)
 	}
 }
 
@@ -706,7 +707,7 @@ func BenchmarkEccentricity_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Eccentricity(g)
+		centrality.Eccentricity(context.Background(), g)
 	}
 }
 
@@ -721,7 +722,7 @@ func BenchmarkEccentricity_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Eccentricity(g)
+		centrality.Eccentricity(context.Background(), g)
 	}
 }
 
@@ -737,7 +738,7 @@ func BenchmarkEccentricity_DiskPreload_100(b *testing.B) {
 	g.PreloadAdjacency()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Eccentricity(g)
+		centrality.Eccentricity(context.Background(), g)
 	}
 }
 
@@ -748,7 +749,7 @@ func BenchmarkDFS_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.DFS(g, 0)
+		traverse.DFS(context.Background(), g, 0)
 	}
 }
 
@@ -763,7 +764,7 @@ func BenchmarkDFS_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.DFS(g, 0)
+		traverse.DFS(context.Background(), g, 0)
 	}
 }
 
@@ -774,7 +775,7 @@ func BenchmarkKCore_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.KCore(3, g)
+		connectivity.KCore(context.Background(), 3, g)
 	}
 }
 
@@ -789,7 +790,7 @@ func BenchmarkKCore_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.KCore(3, g)
+		connectivity.KCore(context.Background(), 3, g)
 	}
 }
 
@@ -800,7 +801,7 @@ func BenchmarkLouvain_Memory_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Louvain(g, 1.0, nil)
+		community.Louvain(context.Background(), g, 1.0, nil)
 	}
 }
 
@@ -815,7 +816,7 @@ func BenchmarkLouvain_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Louvain(g, 1.0, nil)
+		community.Louvain(context.Background(), g, 1.0, nil)
 	}
 }
 
@@ -826,7 +827,7 @@ func BenchmarkLabelProp_Memory_1K(b *testing.B) {
 	g := TwoClusterGraph(500, 0.05, 0.001, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LabelPropagation(g, 20, rand.New(rand.NewSource(int64(i))))
+		community.LabelPropagation(context.Background(), g, 20, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -841,7 +842,7 @@ func BenchmarkLabelProp_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LabelPropagation(g, 20, rand.New(rand.NewSource(int64(i))))
+		community.LabelPropagation(context.Background(), g, 20, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -879,7 +880,7 @@ func BenchmarkNode2Vec_Memory_100(b *testing.B) {
 	params := embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+		embedding.Node2VecWalks(context.Background(), g, params, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -895,7 +896,7 @@ func BenchmarkNode2Vec_Disk_100(b *testing.B) {
 	params := embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+		embedding.Node2VecWalks(context.Background(), g, params, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -906,7 +907,7 @@ func BenchmarkDiameter_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Diameter(g)
+		centrality.Diameter(context.Background(), g)
 	}
 }
 
@@ -921,7 +922,7 @@ func BenchmarkDiameter_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Diameter(g)
+		centrality.Diameter(context.Background(), g)
 	}
 }
 
@@ -932,7 +933,7 @@ func BenchmarkJaccardAll_Memory_100(b *testing.B) {
 	g := ErdosRenyi(100, 0.1, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.JaccardAll(g, 0.1)
+		similarity.JaccardAll(context.Background(), g, 0.1)
 	}
 }
 
@@ -947,7 +948,7 @@ func BenchmarkJaccardAll_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.JaccardAll(g, 0.1)
+		similarity.JaccardAll(context.Background(), g, 0.1)
 	}
 }
 

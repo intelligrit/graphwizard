@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func TestSetCover_Simple(t *testing.T) {
 		{4, 5},        // 3
 	}
 
-	result := SetCover(universe, sets)
+	result := SetCover(context.Background(), universe, sets)
 	// Greedy should pick set 0 (covers 3), then set 3 (covers 2 more) = full cover
 	covered := make(map[int64]bool)
 	for _, idx := range result {
@@ -36,14 +37,14 @@ func TestSetCover_AlreadyCovered(t *testing.T) {
 		{1, 2},
 	}
 
-	result := SetCover(universe, sets)
+	result := SetCover(context.Background(), universe, sets)
 	if len(result) != 1 || result[0] != 0 {
 		t.Errorf("expected [0], got %v", result)
 	}
 }
 
 func TestSetCover_Empty(t *testing.T) {
-	result := SetCover(nil, nil)
+	result := SetCover(context.Background(), nil, nil)
 	if len(result) != 0 {
 		t.Errorf("expected empty result, got %v", result)
 	}
@@ -55,7 +56,7 @@ func TestSetCover_Impossible(t *testing.T) {
 		{1, 2},
 	}
 
-	result := SetCover(universe, sets)
+	result := SetCover(context.Background(), universe, sets)
 	// Should return what it can cover.
 	if len(result) != 1 {
 		t.Errorf("expected 1 set used, got %d", len(result))

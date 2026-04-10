@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -14,7 +15,7 @@ func TestTopologicalSort_DAG(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 
-	order, ok := TopologicalSort(g)
+	order, ok := TopologicalSort(context.Background(), g)
 	if !ok {
 		t.Fatal("expected ok=true for DAG")
 	}
@@ -37,7 +38,7 @@ func TestTopologicalSort_Cycle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
 
-	_, ok := TopologicalSort(g)
+	_, ok := TopologicalSort(context.Background(), g)
 	if ok {
 		t.Error("expected ok=false for cycle")
 	}
@@ -45,7 +46,7 @@ func TestTopologicalSort_Cycle(t *testing.T) {
 
 func TestTopologicalSort_Empty(t *testing.T) {
 	g := simple.NewDirectedGraph()
-	order, ok := TopologicalSort(g)
+	order, ok := TopologicalSort(context.Background(), g)
 	if !ok {
 		t.Error("expected ok=true for empty graph")
 	}

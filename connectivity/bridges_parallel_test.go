@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -23,8 +24,8 @@ func TestBridgesParallel_MatchesSequential(t *testing.T) {
 	// Bridge: 2-3
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	seqBridges := Bridges(g)
-	parBridges := BridgesParallel(g)
+	seqBridges := Bridges(context.Background(), g)
+	parBridges := BridgesParallel(context.Background(), g)
 
 	// Normalize both for comparison.
 	normalize := func(bridges []Bridge) [][2]int64 {
@@ -64,7 +65,7 @@ func TestBridgesParallel_SingleComponent(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	bridges := BridgesParallel(g)
+	bridges := BridgesParallel(context.Background(), g)
 	if len(bridges) != 2 {
 		t.Errorf("expected 2 bridges in chain, got %d", len(bridges))
 	}
@@ -80,7 +81,7 @@ func TestBridgesParallel_DisconnectedNoBridges(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(3)))
 
-	bridges := BridgesParallel(g)
+	bridges := BridgesParallel(context.Background(), g)
 	if len(bridges) != 0 {
 		t.Errorf("expected 0 bridges in disconnected triangles, got %d", len(bridges))
 	}

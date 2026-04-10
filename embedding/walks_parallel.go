@@ -3,10 +3,12 @@
 package embedding
 
 import (
+	"context"
 	"math/rand"
 	"runtime"
 	"sync"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -15,7 +17,7 @@ import (
 // reproducibility while enabling parallelism.
 //
 // This is the recommended version for graphs with >1K nodes.
-func Node2VecWalksParallel(g graph.Undirected, params WalkParams, seed int64) [][]int64 {
+func Node2VecWalksParallel(ctx context.Context, g graph.Undirected, params WalkParams, seed int64) [][]int64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -53,6 +55,7 @@ func Node2VecWalksParallel(g graph.Undirected, params WalkParams, seed int64) []
 	// Use a master RNG for permutation ordering.
 	masterRng := rand.New(rand.NewSource(seed))
 	for w := 0; w < params.WalksPerNode; w++ {
+		progress.Report(ctx, progress.Progress{Phase: "walks", Step: w, Total: params.WalksPerNode})
 		perm := masterRng.Perm(n)
 		for _, idx := range perm {
 			tasks = append(tasks, walkTask{walkIdx: len(tasks), startID: ids[idx]})
@@ -138,8 +141,8 @@ func Node2VecWalksParallel(g graph.Undirected, params WalkParams, seed int64) []
 }
 
 // DeepWalkWalksParallel generates uniform random walks in parallel.
-func DeepWalkWalksParallel(g graph.Undirected, walkLength, walksPerNode int, seed int64) [][]int64 {
-	return Node2VecWalksParallel(g, WalkParams{
+func DeepWalkWalksParallel(ctx context.Context, g graph.Undirected, walkLength, walksPerNode int, seed int64) [][]int64 {
+	return Node2VecWalksParallel(ctx, g, WalkParams{
 		WalkLength:   walkLength,
 		WalksPerNode: walksPerNode,
 		P:            1.0,

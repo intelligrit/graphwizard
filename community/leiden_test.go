@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestLeiden_TwoClusters(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 
 	// Nodes in the same cluster should be in the same community.
 	if comms[0] != comms[1] || comms[1] != comms[2] {
@@ -47,7 +48,7 @@ func TestLeiden_SingleNode(t *testing.T) {
 	g.AddNode(simple.Node(0))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 	if len(comms) != 1 {
 		t.Errorf("expected 1 community assignment, got %d", len(comms))
 	}
@@ -63,7 +64,7 @@ func TestLeiden_CompleteGraph(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 
 	first := comms[0]
 	for id, c := range comms {
@@ -76,7 +77,7 @@ func TestLeiden_CompleteGraph(t *testing.T) {
 func TestLeiden_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 	if len(comms) != 0 {
 		t.Errorf("expected empty result for empty graph, got %v", comms)
 	}

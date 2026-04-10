@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestClusteringCoefficient_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	coeffs := ClusteringCoefficient(g)
+	coeffs := ClusteringCoefficient(context.Background(), g)
 	for id, c := range coeffs {
 		if math.Abs(c-1.0) > epsilon {
 			t.Errorf("node %d: expected C=1.0, got %f", id, c)
@@ -34,7 +35,7 @@ func TestClusteringCoefficient_Star(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 
-	coeffs := ClusteringCoefficient(g)
+	coeffs := ClusteringCoefficient(context.Background(), g)
 	for id, c := range coeffs {
 		if c != 0 {
 			t.Errorf("node %d: expected C=0, got %f", id, c)
@@ -50,7 +51,7 @@ func TestClusteringCoefficient_Square(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 
-	coeffs := ClusteringCoefficient(g)
+	coeffs := ClusteringCoefficient(context.Background(), g)
 	for id, c := range coeffs {
 		if c != 0 {
 			t.Errorf("node %d: expected C=0, got %f", id, c)
@@ -71,7 +72,7 @@ func TestClusteringCoefficient_SquareWithDiagonal(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 
-	coeffs := ClusteringCoefficient(g)
+	coeffs := ClusteringCoefficient(context.Background(), g)
 	if math.Abs(coeffs[0]-2.0/3.0) > epsilon {
 		t.Errorf("node 0: expected C=2/3, got %f", coeffs[0])
 	}
@@ -86,7 +87,7 @@ func TestAverageClusteringCoefficient_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	avg := AverageClusteringCoefficient(g)
+	avg := AverageClusteringCoefficient(context.Background(), g)
 	if math.Abs(avg-1.0) > epsilon {
 		t.Errorf("expected average C=1.0, got %f", avg)
 	}
@@ -94,7 +95,7 @@ func TestAverageClusteringCoefficient_Triangle(t *testing.T) {
 
 func TestClusteringCoefficient_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	coeffs := ClusteringCoefficient(g)
+	coeffs := ClusteringCoefficient(context.Background(), g)
 	if len(coeffs) != 0 {
 		t.Errorf("expected empty map, got %d entries", len(coeffs))
 	}

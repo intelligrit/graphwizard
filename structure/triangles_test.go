@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -14,7 +15,7 @@ func TestTriangleCount_SingleTriangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	perNode, total := TriangleCount(g)
+	perNode, total := TriangleCount(context.Background(), g)
 	if total != 1 {
 		t.Errorf("expected 1 triangle, got %d", total)
 	}
@@ -33,7 +34,7 @@ func TestTriangleCount_K4(t *testing.T) {
 		}
 	}
 
-	perNode, total := TriangleCount(g)
+	perNode, total := TriangleCount(context.Background(), g)
 	// K4 has C(4,3) = 4 triangles.
 	if total != 4 {
 		t.Errorf("expected 4 triangles in K4, got %d", total)
@@ -51,7 +52,7 @@ func TestTriangleCount_NoTriangles(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	_, total := TriangleCount(g)
+	_, total := TriangleCount(context.Background(), g)
 	if total != 0 {
 		t.Errorf("expected 0 triangles in path, got %d", total)
 	}
@@ -59,7 +60,7 @@ func TestTriangleCount_NoTriangles(t *testing.T) {
 
 func TestTriangleCount_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	perNode, total := TriangleCount(g)
+	perNode, total := TriangleCount(context.Background(), g)
 	if total != 0 || len(perNode) != 0 {
 		t.Errorf("expected empty results for empty graph")
 	}

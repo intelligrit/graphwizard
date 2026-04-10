@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -20,7 +22,7 @@ type Bridge struct {
 //
 // Reference: R. Tarjan, "A Note on Finding the Bridges of a Graph",
 // Information Processing Letters, 1974.
-func Bridges(g graph.Undirected) []Bridge {
+func Bridges(ctx context.Context, g graph.Undirected) []Bridge {
 	disc := make(map[int64]int)
 	low := make(map[int64]int)
 	visited := make(map[int64]bool)

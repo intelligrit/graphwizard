@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestBiconnectedComponents_TwoTrianglesWithBridge(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(2)))
 
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	// Expect 3 components: left triangle (3 edges), bridge (1 edge), right triangle (3 edges)
 	if len(comps) != 3 {
 		t.Fatalf("expected 3 biconnected components, got %d", len(comps))
@@ -43,7 +44,7 @@ func TestBiconnectedComponents_SingleTriangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	if len(comps) != 1 {
 		t.Fatalf("expected 1 biconnected component, got %d", len(comps))
 	}
@@ -62,7 +63,7 @@ func TestArticulationPoints_TwoTrianglesWithBridge(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(2)))
 
-	aps := ArticulationPoints(g)
+	aps := ArticulationPoints(context.Background(), g)
 	sort.Slice(aps, func(i, j int) bool { return aps[i] < aps[j] })
 	// Nodes 1 and 2 are articulation points (bridge endpoints)
 	if len(aps) != 2 {
@@ -79,7 +80,7 @@ func TestArticulationPoints_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	aps := ArticulationPoints(g)
+	aps := ArticulationPoints(context.Background(), g)
 	if len(aps) != 0 {
 		t.Errorf("triangle has no articulation points, got %v", aps)
 	}

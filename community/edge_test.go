@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestLeiden_LargerGraph(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(9), simple.Node(10)))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 
 	// Count distinct communities.
 	seen := make(map[int64]bool)
@@ -55,7 +56,7 @@ func TestLeiden_TotalWeightZero(t *testing.T) {
 	g.AddNode(simple.Node(1))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := Leiden(g, 1.0, rng)
+	comms := Leiden(context.Background(), g, 1.0, rng)
 	if len(comms) != 2 {
 		t.Errorf("expected 2 community assignments, got %d", len(comms))
 	}

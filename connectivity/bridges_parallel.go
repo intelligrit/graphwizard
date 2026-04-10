@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"runtime"
 	"sort"
 	"sync"
@@ -15,12 +16,12 @@ import (
 // bridge-finding DFS running independently per connected component.
 //
 // Results are identical to Bridges but computed in parallel across components.
-func BridgesParallel(g graph.Undirected) []Bridge {
+func BridgesParallel(ctx context.Context, g graph.Undirected) []Bridge {
 	components := topo.ConnectedComponents(g)
 
 	if len(components) <= 1 {
 		// Fall back to sequential for single component.
-		return Bridges(g)
+		return Bridges(ctx, g)
 	}
 
 	workers := runtime.GOMAXPROCS(0)

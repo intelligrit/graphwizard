@@ -3,6 +3,7 @@
 package benchmark
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"testing"
@@ -36,7 +37,7 @@ func TestKarateClub_Leiden(t *testing.T) {
 	gt := KarateClubGroundTruth()
 
 	rng := rand.New(rand.NewSource(42))
-	comms := community.Leiden(g, 1.0, rng)
+	comms := community.Leiden(context.Background(), g, 1.0, rng)
 
 	nmi := normalizedMutualInfo(comms, gt)
 	t.Logf("Leiden NMI: %.4f", nmi)
@@ -49,7 +50,7 @@ func TestKarateClub_Louvain(t *testing.T) {
 	g := KarateClub()
 	gt := KarateClubGroundTruth()
 
-	comms := community.Louvain(g, 1.0, nil)
+	comms := community.Louvain(context.Background(), g, 1.0, nil)
 
 	nmi := normalizedMutualInfo(comms, gt)
 	t.Logf("Louvain NMI: %.4f", nmi)
@@ -68,7 +69,7 @@ func TestKarateClub_LabelPropagation(t *testing.T) {
 	bestNMI := 0.0
 	for seed := int64(0); seed < 10; seed++ {
 		rng := rand.New(rand.NewSource(seed))
-		comms := community.LabelPropagation(g, 100, rng)
+		comms := community.LabelPropagation(context.Background(), g, 100, rng)
 		nmi := normalizedMutualInfo(comms, gt)
 		if nmi > bestNMI {
 			bestNMI = nmi
@@ -94,7 +95,7 @@ func TestKarateClub_LeidenBetterThanRandom(t *testing.T) {
 
 	// Leiden.
 	rng2 := rand.New(rand.NewSource(42))
-	leidenComms := community.Leiden(g, 1.0, rng2)
+	leidenComms := community.Leiden(context.Background(), g, 1.0, rng2)
 	leidenNMI := normalizedMutualInfo(leidenComms, gt)
 
 	t.Logf("Random NMI: %.4f, Leiden NMI: %.4f", randomNMI, leidenNMI)
@@ -108,7 +109,7 @@ func TestKarateClub_PageRank(t *testing.T) {
 	// PageRank needs directed; convert to directed (both directions).
 	dg := toDirected(g)
 
-	scores := centrality.PageRank(dg, 0.85, 1e-6)
+	scores := centrality.PageRank(context.Background(), dg, 0.85, 1e-6)
 	if len(scores) != 34 {
 		t.Fatalf("expected 34 scores, got %d", len(scores))
 	}
@@ -131,7 +132,7 @@ func TestKarateClub_PageRank(t *testing.T) {
 func TestKarateClub_Betweenness(t *testing.T) {
 	g := KarateClub()
 
-	scores := centrality.Betweenness(g)
+	scores := centrality.Betweenness(context.Background(), g)
 
 	// Node 0 (Mr. Hi) should have high betweenness — he bridges many paths.
 	if scores[0] < scores[4] {
@@ -141,7 +142,7 @@ func TestKarateClub_Betweenness(t *testing.T) {
 
 func TestKarateClub_Bridges(t *testing.T) {
 	g := KarateClub()
-	bridges := connectivity.Bridges(g)
+	bridges := connectivity.Bridges(context.Background(), g)
 
 	// Karate Club is well-connected; it should have very few bridges.
 	t.Logf("bridges: %d", len(bridges))
@@ -152,7 +153,7 @@ func TestKarateClub_Bridges(t *testing.T) {
 
 func TestKarateClub_TriangleCount(t *testing.T) {
 	g := KarateClub()
-	perNode, total := structure.TriangleCount(g)
+	perNode, total := structure.TriangleCount(context.Background(), g)
 
 	// Known: Karate Club has 45 triangles.
 	if total != 45 {
@@ -167,9 +168,9 @@ func TestKarateClub_TriangleCount(t *testing.T) {
 
 func TestKarateClub_ClusteringCoefficient(t *testing.T) {
 	g := KarateClub()
-	coeffs := structure.ClusteringCoefficient(g)
+	coeffs := structure.ClusteringCoefficient(context.Background(), g)
 
-	avg := structure.AverageClusteringCoefficient(g)
+	avg := structure.AverageClusteringCoefficient(context.Background(), g)
 	t.Logf("average clustering coefficient: %.4f", avg)
 
 	// Known: Karate Club average CC is approximately 0.57.
@@ -181,7 +182,7 @@ func TestKarateClub_ClusteringCoefficient(t *testing.T) {
 
 func TestKarateClub_Diameter(t *testing.T) {
 	g := KarateClub()
-	d := centrality.Diameter(g)
+	d := centrality.Diameter(context.Background(), g)
 
 	// Known: Karate Club diameter is 5.
 	if d != 5 {
@@ -191,7 +192,7 @@ func TestKarateClub_Diameter(t *testing.T) {
 
 func TestKarateClub_ConnectedComponents(t *testing.T) {
 	g := KarateClub()
-	comps := connectivity.ConnectedComponents(g)
+	comps := connectivity.ConnectedComponents(context.Background(), g)
 
 	if len(comps) != 1 {
 		t.Errorf("Karate Club should be fully connected, got %d components", len(comps))
@@ -202,9 +203,9 @@ func TestKarateClub_Jaccard(t *testing.T) {
 	g := KarateClub()
 
 	// Nodes 0 and 1 are directly connected and share many neighbors.
-	j01 := similarity.Jaccard(g, 0, 1)
+	j01 := similarity.Jaccard(context.Background(), g, 0, 1)
 	// Nodes 0 and 33 are the two leaders — moderate Jaccard (different factions).
-	j033 := similarity.Jaccard(g, 0, 33)
+	j033 := similarity.Jaccard(context.Background(), g, 0, 33)
 
 	t.Logf("J(0,1)=%.4f J(0,33)=%.4f", j01, j033)
 	if j01 <= 0 {
@@ -216,7 +217,7 @@ func TestKarateClub_PersonalizedPageRank(t *testing.T) {
 	g := KarateClub()
 	dg := toDirected(g)
 
-	scores := centrality.PersonalizedPageRank(dg, 0, 0.85, 1e-6, 100)
+	scores := centrality.PersonalizedPageRank(context.Background(), dg, 0, 0.85, 1e-6, 100)
 
 	// Node 0's faction should have higher PPR from seed 0.
 	gt := KarateClubGroundTruth()

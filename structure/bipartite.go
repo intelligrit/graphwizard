@@ -3,6 +3,8 @@
 package structure
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 )
@@ -19,7 +21,7 @@ import (
 // nodes are treated as the "bridge" partition.
 //
 // Returns a new weighted undirected graph containing only the projected nodes.
-func BipartiteProject(g graph.Undirected, partition []int64) *simple.WeightedUndirectedGraph {
+func BipartiteProject(ctx context.Context, g graph.Undirected, partition []int64) *simple.WeightedUndirectedGraph {
 	proj := simple.NewWeightedUndirectedGraph(0, 0)
 	partSet := make(map[int64]bool, len(partition))
 	for _, id := range partition {

@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -18,7 +19,7 @@ func TestSpectralClustering_TwoClusters(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(3)))
 
-	clusters := SpectralClustering(g, 2)
+	clusters := SpectralClustering(context.Background(), g, 2)
 	if len(clusters) != 6 {
 		t.Fatalf("expected 6 assignments, got %d", len(clusters))
 	}
@@ -42,7 +43,7 @@ func TestSpectralClustering_TwoClusters(t *testing.T) {
 
 func TestSpectralClustering_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	clusters := SpectralClustering(g, 2)
+	clusters := SpectralClustering(context.Background(), g, 2)
 	if len(clusters) != 0 {
 		t.Errorf("expected empty, got %v", clusters)
 	}
@@ -52,7 +53,7 @@ func TestSpectralClustering_SingleNode(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.AddNode(simple.Node(0))
 
-	clusters := SpectralClustering(g, 1)
+	clusters := SpectralClustering(context.Background(), g, 1)
 	if len(clusters) != 1 {
 		t.Fatalf("expected 1 assignment, got %d", len(clusters))
 	}

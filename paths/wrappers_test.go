@@ -3,6 +3,7 @@
 package paths
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestShortestPath_Chain(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 3))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 4))
 
-	nodes, weight := ShortestPath(g, 0, 2)
+	nodes, weight := ShortestPath(context.Background(), g, 0, 2)
 	if len(nodes) != 3 {
 		t.Fatalf("expected path of 3 nodes, got %d", len(nodes))
 	}
@@ -30,7 +31,7 @@ func TestShortestPath_NoPath(t *testing.T) {
 	g.AddNode(simple.Node(0))
 	g.AddNode(simple.Node(1))
 
-	nodes, weight := ShortestPath(g, 0, 1)
+	nodes, weight := ShortestPath(context.Background(), g, 0, 1)
 	if len(nodes) != 0 {
 		t.Fatalf("expected empty path, got %d nodes", len(nodes))
 	}
@@ -45,7 +46,7 @@ func TestAllShortestPaths_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	allPaths := AllShortestPaths(g)
+	allPaths := AllShortestPaths(context.Background(), g)
 	w := allPaths.Weight(0, 2)
 	if math.IsInf(w, 1) {
 		t.Fatal("expected finite weight between 0 and 2")
@@ -57,7 +58,7 @@ func TestBellmanFord_Chain(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 2))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 3))
 
-	nodes, weight, ok := BellmanFord(g, 0, 2)
+	nodes, weight, ok := BellmanFord(context.Background(), g, 0, 2)
 	if !ok {
 		t.Fatal("expected ok=true (no negative cycle)")
 	}
@@ -75,7 +76,7 @@ func TestBellmanFord_NegativeCycle(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), -3))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(0), 1))
 
-	_, _, ok := BellmanFord(g, 0, 2)
+	_, _, ok := BellmanFord(context.Background(), g, 0, 2)
 	if ok {
 		t.Error("expected ok=false for negative cycle")
 	}
@@ -87,7 +88,7 @@ func TestFloydWarshall_Triangle(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 2))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(2), 5))
 
-	allPaths, ok := FloydWarshall(g)
+	allPaths, ok := FloydWarshall(context.Background(), g)
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
@@ -104,7 +105,7 @@ func TestAStar_Chain(t *testing.T) {
 
 	// Trivial heuristic (always 0) — degenerates to Dijkstra.
 	h := func(a, b graph.Node) float64 { return 0 }
-	nodes, weight := AStar(g, g.Node(0), g.Node(2), gonumpath.Heuristic(h))
+	nodes, weight := AStar(context.Background(), g, g.Node(0), g.Node(2), gonumpath.Heuristic(h))
 	if len(nodes) != 3 {
 		t.Fatalf("expected 3 nodes, got %d", len(nodes))
 	}

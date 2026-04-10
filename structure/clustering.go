@@ -3,6 +3,9 @@
 package structure
 
 import (
+	"context"
+
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -18,12 +21,18 @@ import (
 //
 // Reference: D. Watts and S. Strogatz, "Collective dynamics of 'small-world'
 // networks", Nature, 1998.
-func ClusteringCoefficient(g graph.Undirected) map[int64]float64 {
+func ClusteringCoefficient(ctx context.Context, g graph.Undirected) map[int64]float64 {
 	result := make(map[int64]float64)
 
+	// Count nodes first so we know the total for progress reporting.
+	total := g.Nodes().Len()
+
 	nodes := g.Nodes()
+	i := 0
 	for nodes.Next() {
 		n := nodes.Node()
+		progress.Report(ctx, progress.Progress{Phase: "nodes", Step: i, Total: total})
+		i++
 		neighbors := neighborSet(g, n.ID())
 		k := len(neighbors)
 		if k < 2 {
@@ -53,8 +62,8 @@ func ClusteringCoefficient(g graph.Undirected) map[int64]float64 {
 
 // AverageClusteringCoefficient returns the mean of all local clustering
 // coefficients in the graph.
-func AverageClusteringCoefficient(g graph.Undirected) float64 {
-	coeffs := ClusteringCoefficient(g)
+func AverageClusteringCoefficient(ctx context.Context, g graph.Undirected) float64 {
+	coeffs := ClusteringCoefficient(ctx, g)
 	if len(coeffs) == 0 {
 		return 0
 	}

@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -17,7 +18,7 @@ func TestHopcroftKarp_LargerBipartite(t *testing.T) {
 		}
 	}
 
-	m, size := HopcroftKarp(g, []int64{0, 1, 2})
+	m, size := HopcroftKarp(context.Background(), g, []int64{0, 1, 2})
 	if size != 3 {
 		t.Fatalf("expected matching size 3, got %d", size)
 	}
@@ -35,7 +36,7 @@ func TestHopcroftKarp_EmptyLeft(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.AddNode(simple.Node(0))
 
-	_, size := HopcroftKarp(g, nil)
+	_, size := HopcroftKarp(context.Background(), g, nil)
 	if size != 0 {
 		t.Fatalf("expected matching size 0, got %d", size)
 	}

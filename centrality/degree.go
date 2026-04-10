@@ -3,6 +3,8 @@
 package centrality
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -14,7 +16,7 @@ import (
 //	C_D(v) = deg(v) / (n - 1)
 //
 // For graphs with fewer than 2 nodes, all centralities are 0.
-func Degree(g graph.Undirected) map[int64]float64 {
+func Degree(ctx context.Context, g graph.Undirected) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -46,7 +48,7 @@ func Degree(g graph.Undirected) map[int64]float64 {
 // directed graph.
 //
 //	C_in(v) = in_deg(v) / (n - 1)
-func InDegree(g graph.Directed) map[int64]float64 {
+func InDegree(ctx context.Context, g graph.Directed) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -78,7 +80,7 @@ func InDegree(g graph.Directed) map[int64]float64 {
 // directed graph.
 //
 //	C_out(v) = out_deg(v) / (n - 1)
-func OutDegree(g graph.Directed) map[int64]float64 {
+func OutDegree(ctx context.Context, g graph.Directed) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {

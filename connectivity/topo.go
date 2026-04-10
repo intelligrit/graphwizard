@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/topo"
 )
@@ -15,7 +17,7 @@ import (
 // nil and ok=false if the graph contains a cycle.
 //
 // Wraps gonum/graph/topo.Sort.
-func TopologicalSort(g graph.Directed) (order []int64, ok bool) {
+func TopologicalSort(ctx context.Context, g graph.Directed) (order []int64, ok bool) {
 	sorted, err := topo.Sort(g)
 	if err != nil {
 		return nil, false

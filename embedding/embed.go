@@ -3,6 +3,7 @@
 package embedding
 
 import (
+	"context"
 	"math"
 
 	"gonum.org/v1/gonum/mat"
@@ -24,7 +25,7 @@ type Embedding map[int64][]float64
 //
 // Reference: O. Levy and Y. Goldberg, "Neural Word Embedding as Implicit
 // Matrix Factorization", NIPS 2014.
-func Embed(walks [][]int64, nodeIDs []int64, dim, windowSize int) Embedding {
+func Embed(ctx context.Context, walks [][]int64, nodeIDs []int64, dim, windowSize int) Embedding {
 	n := len(nodeIDs)
 	if n == 0 || dim <= 0 {
 		return make(Embedding)

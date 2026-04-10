@@ -3,9 +3,11 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"sort"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -31,7 +33,7 @@ type MSTResult struct {
 //
 // Reference: J. Kruskal, "On the Shortest Spanning Subtree of a Graph and
 // the Traveling Salesman Problem", Proceedings of the AMS, 1956.
-func Kruskal(g graph.WeightedUndirected) MSTResult {
+func Kruskal(ctx context.Context, g graph.WeightedUndirected) MSTResult {
 	// Collect all edges.
 	var edges []MSTEdge
 	seen := make(map[[2]int64]bool)
@@ -77,7 +79,8 @@ func Kruskal(g graph.WeightedUndirected) MSTResult {
 	var result []MSTEdge
 	totalWeight := 0.0
 
-	for _, e := range edges {
+	for i, e := range edges {
+		progress.Report(ctx, progress.Progress{Phase: "edges", Step: i, Total: len(edges)})
 		ru := find(e.From)
 		rv := find(e.To)
 		if ru == rv {
@@ -107,7 +110,7 @@ func Kruskal(g graph.WeightedUndirected) MSTResult {
 //
 // Reference: R. Prim, "Shortest Connection Networks and Some Generalizations",
 // Bell System Technical Journal, 1957.
-func Prim(g graph.WeightedUndirected, source int64) MSTResult {
+func Prim(ctx context.Context, g graph.WeightedUndirected, source int64) MSTResult {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -140,6 +143,7 @@ func Prim(g graph.WeightedUndirected, source int64) MSTResult {
 	totalWeight := 0.0
 
 	for count := 0; count < n; count++ {
+		progress.Report(ctx, progress.Progress{Phase: "nodes", Step: count, Total: n})
 		// Pick minimum key node not in MST.
 		u := -1
 		minKey := math.Inf(1)

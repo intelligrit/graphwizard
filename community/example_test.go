@@ -3,6 +3,7 @@
 package community_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -25,7 +26,7 @@ func ExampleLeiden() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := community.Leiden(g, 1.0, rng)
+	comms := community.Leiden(context.Background(), g, 1.0, rng)
 	fmt.Printf("same cluster: %v\n", comms[0] == comms[1])
 	fmt.Printf("different clusters: %v\n", comms[0] != comms[3])
 	// Output:
@@ -42,7 +43,7 @@ func ExampleLabelPropagation() {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	labels := community.LabelPropagation(g, 100, rng)
+	labels := community.LabelPropagation(context.Background(), g, 100, rng)
 	// Fully connected: all nodes should converge to one label.
 	fmt.Printf("all same: %v\n", labels[0] == labels[1] && labels[1] == labels[2])
 	// Output: all same: true
@@ -54,7 +55,7 @@ func ExampleLouvain() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	comms := community.Louvain(g, 1.0, nil)
+	comms := community.Louvain(context.Background(), g, 1.0, nil)
 	fmt.Printf("nodes: %d\n", len(comms))
 	// Output: nodes: 3
 }
@@ -69,7 +70,7 @@ func ExampleSpectralClustering() {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(3)))
 
-	clusters := community.SpectralClustering(g, 2)
+	clusters := community.SpectralClustering(context.Background(), g, 2)
 	// Count distinct labels.
 	labels := make(map[int]bool)
 	for _, c := range clusters {
@@ -93,7 +94,7 @@ func ExampleLeidenParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
 	rng := rand.New(rand.NewSource(42))
-	comms := community.LeidenParallel(g, 1.0, rng)
+	comms := community.LeidenParallel(context.Background(), g, 1.0, rng)
 	fmt.Printf("same cluster: %v\n", comms[0] == comms[1])
 	fmt.Printf("different clusters: %v\n", comms[0] != comms[3])
 	// Output:
@@ -107,7 +108,7 @@ func ExampleLouvainQ() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	q := community.LouvainQ(g, [][]graph.Node{
+	q := community.LouvainQ(context.Background(), g, [][]graph.Node{
 		{simple.Node(0), simple.Node(1), simple.Node(2)},
 	}, 1.0)
 	fmt.Printf("Q >= 0: %v\n", q >= 0)

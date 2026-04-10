@@ -3,6 +3,8 @@
 package paths
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
@@ -11,7 +13,7 @@ import (
 // graph, along with the total weight. Returns nil and +Inf if no path exists.
 //
 // Wraps gonum/graph/path.DijkstraFrom.
-func ShortestPath(g graph.Graph, source, target int64) ([]graph.Node, float64) {
+func ShortestPath(ctx context.Context, g graph.Graph, source, target int64) ([]graph.Node, float64) {
 	shortest := path.DijkstraFrom(g.Node(source), g)
 	nodes, weight := shortest.To(target)
 	return nodes, weight
@@ -22,7 +24,7 @@ func ShortestPath(g graph.Graph, source, target int64) ([]graph.Node, float64) {
 // passed to BetweennessWeighted, Closeness, etc.
 //
 // Wraps gonum/graph/path.DijkstraAllPaths.
-func AllShortestPaths(g graph.Graph) path.AllShortest {
+func AllShortestPaths(ctx context.Context, g graph.Graph) path.AllShortest {
 	return path.DijkstraAllPaths(g)
 }
 
@@ -31,7 +33,7 @@ func AllShortestPaths(g graph.Graph) path.AllShortest {
 // nil and +Inf if unreachable. Returns ok=false if a negative cycle exists.
 //
 // Wraps gonum/graph/path.BellmanFordFrom.
-func BellmanFord(g graph.Graph, source, target int64) (nodes []graph.Node, weight float64, ok bool) {
+func BellmanFord(ctx context.Context, g graph.Graph, source, target int64) (nodes []graph.Node, weight float64, ok bool) {
 	shortest, ok := path.BellmanFordFrom(g.Node(source), g)
 	if !ok {
 		return nil, 0, false
@@ -44,6 +46,6 @@ func BellmanFord(g graph.Graph, source, target int64) (nodes []graph.Node, weigh
 // weights. Returns ok=false if a negative cycle exists.
 //
 // Wraps gonum/graph/path.FloydWarshall.
-func FloydWarshall(g graph.Graph) (path.AllShortest, bool) {
+func FloydWarshall(ctx context.Context, g graph.Graph) (path.AllShortest, bool) {
 	return path.FloydWarshall(g)
 }

@@ -3,6 +3,7 @@
 package benchmark
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestScale_Leiden_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := TwoClusterGraph(500, 0.05, 0.001, rng)
 
-	comms := community.Leiden(g, 1.0, rng)
+	comms := community.Leiden(context.Background(), g, 1.0, rng)
 	labels := make(map[int64]bool)
 	for _, c := range comms {
 		labels[c] = true
@@ -37,7 +38,7 @@ func TestScale_Louvain_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := TwoClusterGraph(500, 0.05, 0.001, rng)
 
-	comms := community.Louvain(g, 1.0, nil)
+	comms := community.Louvain(context.Background(), g, 1.0, nil)
 	labels := make(map[int64]bool)
 	for _, c := range comms {
 		labels[c] = true
@@ -52,7 +53,7 @@ func TestScale_LabelProp_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := TwoClusterGraph(500, 0.05, 0.001, rng)
 
-	comms := community.LabelPropagation(g, 50, rng)
+	comms := community.LabelPropagation(context.Background(), g, 50, rng)
 	labels := make(map[int64]bool)
 	for _, c := range comms {
 		labels[c] = true
@@ -67,7 +68,7 @@ func TestScale_Bridges_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(1000, 3, rng)
 
-	bridges := connectivity.Bridges(g)
+	bridges := connectivity.Bridges(context.Background(), g)
 	t.Logf("1K BA graph: %d bridges", len(bridges))
 }
 
@@ -75,7 +76,7 @@ func TestScale_WCC_10K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(10000, 2, rng)
 
-	comps := connectivity.ConnectedComponents(g)
+	comps := connectivity.ConnectedComponents(context.Background(), g)
 	t.Logf("10K BA graph: %d components", len(comps))
 	if len(comps) != 1 {
 		t.Error("BA graph should be connected")
@@ -86,7 +87,7 @@ func TestScale_Triangles_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(1000, 5, rng)
 
-	_, total := structure.TriangleCount(g)
+	_, total := structure.TriangleCount(context.Background(), g)
 	t.Logf("1K BA(m=5) graph: %d triangles", total)
 	if total == 0 {
 		t.Error("BA graph with m=5 should have triangles")
@@ -97,7 +98,7 @@ func TestScale_ClusteringCoefficient_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(1000, 3, rng)
 
-	avg := structure.AverageClusteringCoefficient(g)
+	avg := structure.AverageClusteringCoefficient(context.Background(), g)
 	t.Logf("1K BA(m=3) avg CC: %.4f", avg)
 	if avg == 0 {
 		t.Error("BA graph should have non-zero clustering")
@@ -108,7 +109,7 @@ func TestScale_Degree_10K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(10000, 3, rng)
 
-	scores := centrality.Degree(g)
+	scores := centrality.Degree(context.Background(), g)
 	if len(scores) != 10000 {
 		t.Errorf("expected 10000 scores, got %d", len(scores))
 	}
@@ -123,7 +124,7 @@ func TestScale_BFS_10K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(10000, 2, rng)
 
-	visited := traverse.BFS(g, 0)
+	visited := traverse.BFS(context.Background(), g, 0)
 	if len(visited) != 10000 {
 		t.Errorf("BFS should reach all 10K nodes, reached %d", len(visited))
 	}
@@ -134,7 +135,7 @@ func TestScale_Jaccard_1K(t *testing.T) {
 	g := BarabasiAlbert(1000, 3, rng)
 
 	// Spot check: nodes 0 and 1 (both early, high degree).
-	j := similarity.Jaccard(g, 0, 1)
+	j := similarity.Jaccard(context.Background(), g, 0, 1)
 	t.Logf("J(0,1) in 1K BA: %.4f", j)
 }
 
@@ -142,7 +143,7 @@ func TestScale_Node2Vec_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(1000, 3, rng)
 
-	walks := embedding.Node2VecWalks(g, embedding.WalkParams{
+	walks := embedding.Node2VecWalks(context.Background(), g, embedding.WalkParams{
 		WalkLength:   20,
 		WalksPerNode: 5,
 		P:            1.0,
@@ -164,7 +165,7 @@ func TestScale_Kruskal_1K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := WeightedErdosRenyi(1000, 0.01, 10.0, rng)
 
-	result := structure.Kruskal(g)
+	result := structure.Kruskal(context.Background(), g)
 	t.Logf("1K ER MST: %d edges, weight %.2f", len(result.Edges), result.Weight)
 }
 
@@ -172,7 +173,7 @@ func TestScale_KCore_10K(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := BarabasiAlbert(10000, 3, rng)
 
-	core := connectivity.KCore(3, g)
+	core := connectivity.KCore(context.Background(), 3, g)
 	t.Logf("10K BA 3-core: %d nodes", len(core))
 	if len(core) == 0 {
 		t.Error("BA(m=3) should have a non-empty 3-core")
@@ -186,7 +187,7 @@ func BenchmarkLeiden_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Leiden(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.Leiden(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -195,7 +196,7 @@ func BenchmarkLouvain_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Louvain(g, 1.0, nil)
+		community.Louvain(context.Background(), g, 1.0, nil)
 	}
 }
 
@@ -204,7 +205,7 @@ func BenchmarkLabelProp_1K(b *testing.B) {
 	g := TwoClusterGraph(500, 0.05, 0.001, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LabelPropagation(g, 20, rand.New(rand.NewSource(int64(i))))
+		community.LabelPropagation(context.Background(), g, 20, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -213,7 +214,7 @@ func BenchmarkBridges_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.Bridges(g)
+		connectivity.Bridges(context.Background(), g)
 	}
 }
 
@@ -222,7 +223,7 @@ func BenchmarkBetweenness_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Betweenness(g)
+		centrality.Betweenness(context.Background(), g)
 	}
 }
 
@@ -231,7 +232,7 @@ func BenchmarkBetweenness_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Betweenness(g)
+		centrality.Betweenness(context.Background(), g)
 	}
 }
 
@@ -240,7 +241,7 @@ func BenchmarkDegree_10K(b *testing.B) {
 	g := BarabasiAlbert(10000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Degree(g)
+		centrality.Degree(context.Background(), g)
 	}
 }
 
@@ -250,7 +251,7 @@ func BenchmarkPageRank_1K(b *testing.B) {
 	dg := toDirected(ug)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.PageRank(dg, 0.85, 1e-6)
+		centrality.PageRank(context.Background(), dg, 0.85, 1e-6)
 	}
 }
 
@@ -259,7 +260,7 @@ func BenchmarkTriangleCount_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 5, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCount(g)
+		structure.TriangleCount(context.Background(), g)
 	}
 }
 
@@ -268,7 +269,7 @@ func BenchmarkBFS_10K(b *testing.B) {
 	g := BarabasiAlbert(10000, 2, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.BFS(g, 0)
+		traverse.BFS(context.Background(), g, 0)
 	}
 }
 
@@ -277,7 +278,7 @@ func BenchmarkKruskal_1K(b *testing.B) {
 	g := WeightedErdosRenyi(1000, 0.01, 10.0, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.Kruskal(g)
+		structure.Kruskal(context.Background(), g)
 	}
 }
 
@@ -287,7 +288,7 @@ func BenchmarkNode2Vec_1K(b *testing.B) {
 	params := embedding.WalkParams{WalkLength: 20, WalksPerNode: 5, P: 1, Q: 1}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+		embedding.Node2VecWalks(context.Background(), g, params, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -296,7 +297,7 @@ func BenchmarkWCC_10K(b *testing.B) {
 	g := BarabasiAlbert(10000, 2, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.ConnectedComponents(g)
+		connectivity.ConnectedComponents(context.Background(), g)
 	}
 }
 
@@ -305,6 +306,6 @@ func BenchmarkClusteringCoefficient_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficient(g)
+		structure.ClusteringCoefficient(context.Background(), g)
 	}
 }

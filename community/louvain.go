@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"math/rand/v2"
 
 	"gonum.org/v1/gonum/graph"
@@ -16,7 +17,7 @@ import (
 // produce more, smaller communities. Use 1.0 for standard modularity.
 //
 // Wraps gonum/graph/community.Modularize.
-func Louvain(g graph.Graph, resolution float64, src rand.Source) map[int64]int64 {
+func Louvain(ctx context.Context, g graph.Graph, resolution float64, src rand.Source) map[int64]int64 {
 	reduced := community.Modularize(g, resolution, src)
 	return extractCommunities(reduced)
 }
@@ -25,7 +26,7 @@ func Louvain(g graph.Graph, resolution float64, src rand.Source) map[int64]int64
 // given communities at the given resolution.
 //
 // Wraps gonum/graph/community.Q.
-func LouvainQ(g graph.Graph, communities [][]graph.Node, resolution float64) float64 {
+func LouvainQ(ctx context.Context, g graph.Graph, communities [][]graph.Node, resolution float64) float64 {
 	return community.Q(g, communities, resolution)
 }
 

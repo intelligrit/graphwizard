@@ -3,9 +3,11 @@
 package centrality
 
 import (
+	"context"
 	"math"
 
 	"github.com/intelligrit/graphwizard"
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -23,7 +25,7 @@ import (
 //
 // Reference: L. Katz, "A New Status Index Derived from Sociometric Analysis",
 // Psychometrika, 1953.
-func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func Katz(ctx context.Context, g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	// Collect node IDs.
 	nodes := g.Nodes()
 	var ids []int64
@@ -63,6 +65,7 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 	}
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		xNew := make([]float64, n)
 		for i := 0; i < n; i++ {
 			sum := 0.0
@@ -92,12 +95,12 @@ func Katz(g graph.Directed, alpha, beta, tol float64, maxIter int) map[int64]flo
 
 // KatzUndirected returns the Katz centrality for each node in an undirected
 // graph by treating each undirected edge as two directed edges.
-func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func KatzUndirected(ctx context.Context, g graph.Undirected, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	// Fast path: use precomputed dense adjacency when available.
 	// NodeIDs() returns nil when the backing store hasn't been preloaded,
 	// so check that the dense structure is actually populated.
 	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
-		return katzUndirectedDense(da, alpha, beta, tol, maxIter)
+		return katzUndirectedDense(ctx, da, alpha, beta, tol, maxIter)
 	}
 
 	nodes := g.Nodes()
@@ -132,6 +135,7 @@ func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) m
 	x := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		xNew := make([]float64, n)
 		for i := 0; i < n; i++ {
 			sum := 0.0
@@ -160,7 +164,7 @@ func KatzUndirected(g graph.Undirected, alpha, beta, tol float64, maxIter int) m
 
 // katzUndirectedDense uses DenseAdjacency to avoid building a separate adj copy.
 // The hot loop reads DenseNeighbors directly — no allocation beyond x and xNew.
-func katzUndirectedDense(da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
+func katzUndirectedDense(ctx context.Context, da graphwizard.DenseAdjacency, alpha, beta, tol float64, maxIter int) map[int64]float64 {
 	ids := da.NodeIDs()
 	n := da.NumNodes()
 	if n == 0 {
@@ -171,6 +175,7 @@ func katzUndirectedDense(da graphwizard.DenseAdjacency, alpha, beta, tol float64
 	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		for i := range xNew {
 			xNew[i] = 0
 		}

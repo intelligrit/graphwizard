@@ -3,6 +3,8 @@
 package traverse
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/traverse"
 )
@@ -11,7 +13,7 @@ import (
 // all reachable node IDs in BFS order.
 //
 // Wraps gonum/graph/traverse.BreadthFirst.
-func BFS(g graph.Graph, source int64) []int64 {
+func BFS(ctx context.Context, g graph.Graph, source int64) []int64 {
 	var visited []int64
 	w := traverse.BreadthFirst{
 		Visit: func(n graph.Node) {
@@ -26,7 +28,7 @@ func BFS(g graph.Graph, source int64) []int64 {
 // all reachable node IDs in DFS order.
 //
 // Wraps gonum/graph/traverse.DepthFirst.
-func DFS(g graph.Graph, source int64) []int64 {
+func DFS(ctx context.Context, g graph.Graph, source int64) []int64 {
 	var visited []int64
 	w := traverse.DepthFirst{
 		Visit: func(n graph.Node) {
@@ -39,7 +41,7 @@ func DFS(g graph.Graph, source int64) []int64 {
 
 // BFSPath returns the shortest unweighted path from source to target as a
 // slice of node IDs. Returns nil if no path exists.
-func BFSPath(g graph.Graph, source, target int64) []int64 {
+func BFSPath(ctx context.Context, g graph.Graph, source, target int64) []int64 {
 	parent := make(map[int64]int64)
 	found := false
 

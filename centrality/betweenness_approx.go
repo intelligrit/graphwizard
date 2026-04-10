@@ -3,11 +3,13 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"runtime"
 	"sync"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -23,7 +25,7 @@ import (
 //
 // Reference: U. Brandes and C. Pich, "Centrality Estimation in Large
 // Networks", International Journal of Bifurcation and Chaos, 2007.
-func ApproximateBetweenness(g graph.Graph, k int, rng *rand.Rand) map[int64]float64 {
+func ApproximateBetweenness(ctx context.Context, g graph.Graph, k int, rng *rand.Rand) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -87,7 +89,10 @@ func ApproximateBetweenness(g graph.Graph, k int, rng *rand.Rand) map[int64]floa
 
 	// Aggregate.
 	result := make(map[int64]float64, n)
+	completed := 0
 	for lr := range resultsCh {
+		completed++
+		progress.Report(ctx, progress.Progress{Phase: "sources", Step: completed, Total: workers})
 		for id, v := range lr.scores {
 			result[id] += v
 		}

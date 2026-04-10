@@ -3,6 +3,7 @@
 package similarity
 
 import (
+	"context"
 	"runtime"
 	"sort"
 	"sync"
@@ -18,7 +19,7 @@ import (
 // only computes similarity for nodes sharing at least one neighbor.
 //
 // The graph implementation must be safe for concurrent reads.
-func JaccardAllParallel(g graph.Undirected, threshold float64) []NodePairScore {
+func JaccardAllParallel(ctx context.Context, g graph.Undirected, threshold float64) []NodePairScore {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -95,7 +96,7 @@ func JaccardAllParallel(g graph.Undirected, threshold float64) []NodePairScore {
 // for graphs with fewer than ~50K nodes.
 //
 // The graph implementation must be safe for concurrent reads.
-func PredictLinksParallel(g graph.Undirected, k int, scorer func(graph.Undirected, int64, int64) float64) []PredictedLink {
+func PredictLinksParallel(ctx context.Context, g graph.Undirected, k int, scorer func(graph.Undirected, int64, int64) float64) []PredictedLink {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {

@@ -3,6 +3,8 @@
 package paths
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
@@ -12,7 +14,7 @@ import (
 // actual cost (admissible). Returns nil and +Inf if no path exists.
 //
 // Wraps gonum/graph/path.AStar.
-func AStar(g graph.Graph, source, target graph.Node, h path.Heuristic) ([]graph.Node, float64) {
+func AStar(ctx context.Context, g graph.Graph, source, target graph.Node, h path.Heuristic) ([]graph.Node, float64) {
 	shortest, _ := path.AStar(source, target, g, h)
 	nodes, weight := shortest.To(target.ID())
 	return nodes, weight

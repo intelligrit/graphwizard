@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestBridges_SingleBridge(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(5), simple.Node(2)))
 
-	bridges := Bridges(g)
+	bridges := Bridges(context.Background(), g)
 	if len(bridges) != 1 {
 		t.Fatalf("expected 1 bridge, got %d", len(bridges))
 	}
@@ -52,7 +53,7 @@ func TestBridges_NoBridges(t *testing.T) {
 		}
 	}
 
-	bridges := Bridges(g)
+	bridges := Bridges(context.Background(), g)
 	if len(bridges) != 0 {
 		t.Fatalf("expected 0 bridges in K4, got %d", len(bridges))
 	}
@@ -65,7 +66,7 @@ func TestBridges_AllBridges(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	bridges := Bridges(g)
+	bridges := Bridges(context.Background(), g)
 	if len(bridges) != 3 {
 		t.Fatalf("expected 3 bridges in path graph, got %d", len(bridges))
 	}
@@ -77,7 +78,7 @@ func TestBridges_DisconnectedGraph(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	bridges := Bridges(g)
+	bridges := Bridges(context.Background(), g)
 	if len(bridges) != 2 {
 		t.Fatalf("expected 2 bridges, got %d", len(bridges))
 	}
@@ -85,7 +86,7 @@ func TestBridges_DisconnectedGraph(t *testing.T) {
 
 func TestBridges_EmptyGraph(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	bridges := Bridges(g)
+	bridges := Bridges(context.Background(), g)
 	if len(bridges) != 0 {
 		t.Fatalf("expected 0 bridges in empty graph, got %d", len(bridges))
 	}

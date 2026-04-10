@@ -2,6 +2,12 @@
 
 package structure
 
+import (
+	"context"
+
+	"github.com/intelligrit/graphwizard/progress"
+)
+
 // SetCover solves the minimum set cover problem using a greedy approximation.
 //
 // Given a universe of elements and a collection of sets (each identified by an
@@ -10,7 +16,7 @@ package structure
 //
 // Reference: V. Chvatal, "A Greedy Heuristic for the Set-Covering Problem",
 // Mathematics of Operations Research, 1979.
-func SetCover(universe []int64, sets [][]int64) []int {
+func SetCover(ctx context.Context, universe []int64, sets [][]int64) []int {
 	uncovered := make(map[int64]bool, len(universe))
 	for _, e := range universe {
 		uncovered[e] = true
@@ -18,8 +24,11 @@ func SetCover(universe []int64, sets [][]int64) []int {
 
 	used := make(map[int]bool)
 	var result []int
+	iteration := 0
 
 	for len(uncovered) > 0 {
+		progress.Report(ctx, progress.Progress{Phase: "greedy", Step: iteration, Total: -1})
+		iteration++
 		// Pick the set that covers the most uncovered elements.
 		bestIdx := -1
 		bestCount := 0

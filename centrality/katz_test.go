@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -31,7 +32,7 @@ func TestKatz_StarGraph(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 
-	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	scores := Katz(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	if scores[0] <= scores[1] {
 		t.Errorf("node 0 (hub) should have highest Katz; got 0=%f, 1=%f", scores[0], scores[1])
 	}
@@ -44,7 +45,7 @@ func TestKatz_Chain(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	scores := Katz(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	// Node 3 receives from 2, and transitively from 1 and 0.
 	if scores[3] <= scores[0] {
 		t.Errorf("node 3 should have highest Katz; got 3=%f, 0=%f", scores[3], scores[0])
@@ -53,7 +54,7 @@ func TestKatz_Chain(t *testing.T) {
 
 func TestKatz_EmptyGraph(t *testing.T) {
 	g := simple.NewDirectedGraph()
-	scores := Katz(g, 0.1, 1.0, 1e-8, 100)
+	scores := Katz(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	if len(scores) != 0 {
 		t.Errorf("expected empty map for empty graph, got %v", scores)
 	}
@@ -65,7 +66,7 @@ func TestKatzUndirected_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	scores := KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	// All nodes symmetric, should have equal Katz.
 	if math.Abs(scores[0]-scores[1]) > epsilon || math.Abs(scores[1]-scores[2]) > epsilon {
 		t.Errorf("symmetric triangle should have equal Katz; got %v", scores)
@@ -98,7 +99,7 @@ func TestKatzUndirected_UnpreloadedDenseAdjacency(t *testing.T) {
 		t.Fatal("test wrapper NodeIDs must return nil")
 	}
 
-	scores := KatzUndirected(g, 0.1, 1.0, 1e-8, 100)
+	scores := KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	if len(scores) != 3 {
 		t.Fatalf("expected 3 scores, got %d", len(scores))
 	}

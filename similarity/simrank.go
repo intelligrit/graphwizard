@@ -3,8 +3,10 @@
 package similarity
 
 import (
+	"context"
 	"sort"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -20,7 +22,7 @@ import (
 //
 // Reference: G. Jeh and J. Widom, "SimRank: A Measure of Structural-Context
 // Similarity", KDD 2002.
-func SimRank(g graph.Directed, decay float64, maxIter int) map[[2]int64]float64 {
+func SimRank(ctx context.Context, g graph.Directed, decay float64, maxIter int) map[[2]int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -55,6 +57,7 @@ func SimRank(g graph.Directed, decay float64, maxIter int) map[[2]int64]float64 
 	}
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		newSim := make([][]float64, n)
 		for i := range newSim {
 			newSim[i] = make([]float64, n)

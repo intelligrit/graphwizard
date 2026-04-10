@@ -4,9 +4,11 @@ package paths
 
 import (
 	"container/heap"
+	"context"
 	"math"
 	"sort"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
@@ -48,7 +50,7 @@ type WeightedPath struct {
 //
 // Reference: J. Yen, "Finding the K Shortest Loopless Paths in a Network",
 // Management Science, 1971.
-func YenKShortest(g graph.WeightedDirected, source, target int64, k int) []WeightedPath {
+func YenKShortest(ctx context.Context, g graph.WeightedDirected, source, target int64, k int) []WeightedPath {
 	if k <= 0 {
 		return nil
 	}
@@ -64,6 +66,7 @@ func YenKShortest(g graph.WeightedDirected, source, target int64, k int) []Weigh
 	var B []WeightedPath
 
 	for ki := 1; ki < k; ki++ {
+		progress.Report(ctx, progress.Progress{Phase: "yen", Step: ki, Total: k})
 		prevPath := A[ki-1].Nodes
 
 		for i := 0; i < len(prevPath)-1; i++ {

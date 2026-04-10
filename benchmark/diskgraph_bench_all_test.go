@@ -3,6 +3,7 @@
 package benchmark
 
 import (
+	"context"
 	"math/rand"
 	"path/filepath"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/intelligrit/graphwizard/structure"
 	"github.com/intelligrit/graphwizard/subgraph"
 	"github.com/intelligrit/graphwizard/traverse"
+	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 )
 
@@ -34,7 +36,7 @@ func BenchmarkApproxBetweenness_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.ApproximateBetweenness(g, 100, rand.New(rand.NewSource(int64(i))))
+		centrality.ApproximateBetweenness(context.Background(), g, 100, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -49,7 +51,7 @@ func BenchmarkApproxBetweenness_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.ApproximateBetweenness(g, 100, rand.New(rand.NewSource(int64(i))))
+		centrality.ApproximateBetweenness(context.Background(), g, 100, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -60,7 +62,7 @@ func BenchmarkEdgeBetweenness_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.EdgeBetweenness(g)
+		centrality.EdgeBetweenness(context.Background(), g)
 	}
 }
 
@@ -75,7 +77,7 @@ func BenchmarkEdgeBetweenness_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.EdgeBetweenness(g)
+		centrality.EdgeBetweenness(context.Background(), g)
 	}
 }
 
@@ -86,7 +88,7 @@ func BenchmarkEccentricityParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.EccentricityParallel(g)
+		centrality.EccentricityParallel(context.Background(), g)
 	}
 }
 
@@ -101,7 +103,7 @@ func BenchmarkEccentricityParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.EccentricityParallel(g)
+		centrality.EccentricityParallel(context.Background(), g)
 	}
 }
 
@@ -112,7 +114,7 @@ func BenchmarkDiameterParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.DiameterParallel(g)
+		centrality.DiameterParallel(context.Background(), g)
 	}
 }
 
@@ -127,7 +129,7 @@ func BenchmarkDiameterParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.DiameterParallel(g)
+		centrality.DiameterParallel(context.Background(), g)
 	}
 }
 
@@ -138,7 +140,7 @@ func BenchmarkRadius_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Radius(g)
+		centrality.Radius(context.Background(), g)
 	}
 }
 
@@ -153,7 +155,7 @@ func BenchmarkRadius_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Radius(g)
+		centrality.Radius(context.Background(), g)
 	}
 }
 
@@ -164,7 +166,7 @@ func BenchmarkKatzUndirected_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.KatzUndirected(g, 0.01, 1.0, 1e-6, 50)
+		centrality.KatzUndirected(context.Background(), g, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -179,7 +181,7 @@ func BenchmarkKatzUndirected_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.KatzUndirected(g, 0.01, 1.0, 1e-6, 50)
+		centrality.KatzUndirected(context.Background(), g, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -190,7 +192,7 @@ func BenchmarkKatzUndirectedParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.KatzUndirectedParallel(g, 0.01, 1.0, 1e-6, 50)
+		centrality.KatzUndirectedParallel(context.Background(), g, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -205,7 +207,7 @@ func BenchmarkKatzUndirectedParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.KatzUndirectedParallel(g, 0.01, 1.0, 1e-6, 50)
+		centrality.KatzUndirectedParallel(context.Background(), g, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -216,7 +218,7 @@ func BenchmarkPPRUndirected_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.PersonalizedPageRankUndirected(g, 0, 0.85, 1e-6, 100)
+		centrality.PersonalizedPageRankUndirected(context.Background(), g, 0, 0.85, 1e-6, 100)
 	}
 }
 
@@ -231,7 +233,7 @@ func BenchmarkPPRUndirected_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.PersonalizedPageRankUndirected(g, 0, 0.85, 1e-6, 100)
+		centrality.PersonalizedPageRankUndirected(context.Background(), g, 0, 0.85, 1e-6, 100)
 	}
 }
 
@@ -242,7 +244,7 @@ func BenchmarkInfluence_Memory_50(b *testing.B) {
 	g := BarabasiAlbert(50, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.InfluenceMaximization(g, 3, 0.1, 100, rand.New(rand.NewSource(int64(i))))
+		centrality.InfluenceMaximization(context.Background(), g, 3, 0.1, 100, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -257,7 +259,7 @@ func BenchmarkInfluence_Disk_50(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.InfluenceMaximization(g, 3, 0.1, 100, rand.New(rand.NewSource(int64(i))))
+		centrality.InfluenceMaximization(context.Background(), g, 3, 0.1, 100, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -268,7 +270,7 @@ func BenchmarkLeidenParallel_Memory_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LeidenParallel(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.LeidenParallel(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -283,7 +285,7 @@ func BenchmarkLeidenParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LeidenParallel(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.LeidenParallel(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -294,7 +296,7 @@ func BenchmarkSpectral_Memory_50(b *testing.B) {
 	g := TwoClusterGraph(25, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.SpectralClustering(g, 2)
+		community.SpectralClustering(context.Background(), g, 2)
 	}
 }
 
@@ -309,7 +311,7 @@ func BenchmarkSpectral_Disk_50(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.SpectralClustering(g, 2)
+		community.SpectralClustering(context.Background(), g, 2)
 	}
 }
 
@@ -320,7 +322,7 @@ func BenchmarkBridgesParallel_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.BridgesParallel(g)
+		connectivity.BridgesParallel(context.Background(), g)
 	}
 }
 
@@ -335,7 +337,7 @@ func BenchmarkBridgesParallel_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.BridgesParallel(g)
+		connectivity.BridgesParallel(context.Background(), g)
 	}
 }
 
@@ -346,7 +348,7 @@ func BenchmarkArticulationPoints_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.ArticulationPoints(g)
+		connectivity.ArticulationPoints(context.Background(), g)
 	}
 }
 
@@ -361,7 +363,7 @@ func BenchmarkArticulationPoints_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.ArticulationPoints(g)
+		connectivity.ArticulationPoints(context.Background(), g)
 	}
 }
 
@@ -372,7 +374,7 @@ func BenchmarkBiconnected_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.BiconnectedComponents(g)
+		connectivity.BiconnectedComponents(context.Background(), g)
 	}
 }
 
@@ -387,7 +389,7 @@ func BenchmarkBiconnected_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.BiconnectedComponents(g)
+		connectivity.BiconnectedComponents(context.Background(), g)
 	}
 }
 
@@ -398,7 +400,7 @@ func BenchmarkDegeneracy_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.DegeneracyOrdering(g)
+		connectivity.DegeneracyOrdering(context.Background(), g)
 	}
 }
 
@@ -413,7 +415,7 @@ func BenchmarkDegeneracy_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.DegeneracyOrdering(g)
+		connectivity.DegeneracyOrdering(context.Background(), g)
 	}
 }
 
@@ -424,7 +426,7 @@ func BenchmarkUndirectedCycles_Memory_50(b *testing.B) {
 	g := BarabasiAlbert(50, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.UndirectedCycles(g)
+		connectivity.UndirectedCycles(context.Background(), g)
 	}
 }
 
@@ -439,7 +441,7 @@ func BenchmarkUndirectedCycles_Disk_50(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.UndirectedCycles(g)
+		connectivity.UndirectedCycles(context.Background(), g)
 	}
 }
 
@@ -450,7 +452,7 @@ func BenchmarkTriangleCountParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 5, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCountParallel(g)
+		structure.TriangleCountParallel(context.Background(), g)
 	}
 }
 
@@ -465,7 +467,7 @@ func BenchmarkTriangleCountParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCountParallel(g)
+		structure.TriangleCountParallel(context.Background(), g)
 	}
 }
 
@@ -476,7 +478,7 @@ func BenchmarkClusteringCoeffParallel_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficientParallel(g)
+		structure.ClusteringCoefficientParallel(context.Background(), g)
 	}
 }
 
@@ -491,7 +493,7 @@ func BenchmarkClusteringCoeffParallel_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficientParallel(g)
+		structure.ClusteringCoefficientParallel(context.Background(), g)
 	}
 }
 
@@ -507,7 +509,7 @@ func BenchmarkClusteringCoeffParallel_DiskPreload_1K(b *testing.B) {
 	g.PreloadAdjacency()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficientParallel(g)
+		structure.ClusteringCoefficientParallel(context.Background(), g)
 	}
 }
 
@@ -518,7 +520,7 @@ func BenchmarkMaximalCliques_Memory_50(b *testing.B) {
 	g := BarabasiAlbert(50, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.MaximalCliques(g)
+		structure.MaximalCliques(context.Background(), g)
 	}
 }
 
@@ -533,7 +535,7 @@ func BenchmarkMaximalCliques_Disk_50(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.MaximalCliques(g)
+		structure.MaximalCliques(context.Background(), g)
 	}
 }
 
@@ -544,7 +546,7 @@ func BenchmarkGraphColoring_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.GraphColoring(g)
+		structure.GraphColoring(context.Background(), g)
 	}
 }
 
@@ -559,7 +561,7 @@ func BenchmarkGraphColoring_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.GraphColoring(g)
+		structure.GraphColoring(context.Background(), g)
 	}
 }
 
@@ -570,7 +572,7 @@ func BenchmarkKruskal_Memory_1K(b *testing.B) {
 	g := WeightedErdosRenyi(1000, 0.01, 10.0, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.Kruskal(g)
+		structure.Kruskal(context.Background(), g)
 	}
 }
 
@@ -585,7 +587,7 @@ func BenchmarkKruskal_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.Kruskal(g)
+		structure.Kruskal(context.Background(), g)
 	}
 }
 
@@ -596,7 +598,7 @@ func BenchmarkPrim_Memory_1K(b *testing.B) {
 	g := WeightedErdosRenyi(1000, 0.01, 10.0, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.Prim(g, 0)
+		structure.Prim(context.Background(), g, 0)
 	}
 }
 
@@ -611,7 +613,7 @@ func BenchmarkPrim_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.Prim(g, 0)
+		structure.Prim(context.Background(), g, 0)
 	}
 }
 
@@ -622,7 +624,7 @@ func BenchmarkTSP_Memory_50(b *testing.B) {
 	g := WeightedErdosRenyi(50, 0.5, 10.0, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TSP(g)
+		structure.TSP(context.Background(), g)
 	}
 }
 
@@ -637,7 +639,7 @@ func BenchmarkTSP_Disk_50(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TSP(g)
+		structure.TSP(context.Background(), g)
 	}
 }
 
@@ -648,7 +650,7 @@ func BenchmarkOverlap_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Overlap(g, 0, 1)
+		similarity.Overlap(context.Background(), g, 0, 1)
 	}
 }
 
@@ -663,7 +665,7 @@ func BenchmarkOverlap_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Overlap(g, 0, 1)
+		similarity.Overlap(context.Background(), g, 0, 1)
 	}
 }
 
@@ -674,7 +676,7 @@ func BenchmarkCommonNeighbors_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.CommonNeighbors(g, 0, 1)
+		similarity.CommonNeighbors(context.Background(), g, 0, 1)
 	}
 }
 
@@ -689,7 +691,7 @@ func BenchmarkCommonNeighbors_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.CommonNeighbors(g, 0, 1)
+		similarity.CommonNeighbors(context.Background(), g, 0, 1)
 	}
 }
 
@@ -700,7 +702,7 @@ func BenchmarkAdamicAdar_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.AdamicAdar(g, 0, 1)
+		similarity.AdamicAdar(context.Background(), g, 0, 1)
 	}
 }
 
@@ -715,7 +717,7 @@ func BenchmarkAdamicAdar_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.AdamicAdar(g, 0, 1)
+		similarity.AdamicAdar(context.Background(), g, 0, 1)
 	}
 }
 
@@ -726,7 +728,7 @@ func BenchmarkPrefAttach_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PreferentialAttachment(g, 0, 1)
+		similarity.PreferentialAttachment(context.Background(), g, 0, 1)
 	}
 }
 
@@ -741,7 +743,7 @@ func BenchmarkPrefAttach_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PreferentialAttachment(g, 0, 1)
+		similarity.PreferentialAttachment(context.Background(), g, 0, 1)
 	}
 }
 
@@ -752,7 +754,7 @@ func BenchmarkCosine_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Cosine(g, 0, 1)
+		similarity.Cosine(context.Background(), g, 0, 1)
 	}
 }
 
@@ -767,7 +769,7 @@ func BenchmarkCosine_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.Cosine(g, 0, 1)
+		similarity.Cosine(context.Background(), g, 0, 1)
 	}
 }
 
@@ -778,7 +780,7 @@ func BenchmarkJaccardAllParallel_Memory_100(b *testing.B) {
 	g := ErdosRenyi(100, 0.1, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.JaccardAllParallel(g, 0.1)
+		similarity.JaccardAllParallel(context.Background(), g, 0.1)
 	}
 }
 
@@ -793,7 +795,7 @@ func BenchmarkJaccardAllParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.JaccardAllParallel(g, 0.1)
+		similarity.JaccardAllParallel(context.Background(), g, 0.1)
 	}
 }
 
@@ -804,7 +806,9 @@ func BenchmarkPredictLinks_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PredictLinks(g, 5, similarity.Jaccard)
+		similarity.PredictLinks(context.Background(), g, 5, func(gg graph.Undirected, u, v int64) float64 {
+			return similarity.Jaccard(context.Background(), gg, u, v)
+		})
 	}
 }
 
@@ -819,7 +823,9 @@ func BenchmarkPredictLinks_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PredictLinks(g, 5, similarity.Jaccard)
+		similarity.PredictLinks(context.Background(), g, 5, func(gg graph.Undirected, u, v int64) float64 {
+			return similarity.Jaccard(context.Background(), gg, u, v)
+		})
 	}
 }
 
@@ -830,7 +836,9 @@ func BenchmarkPredictLinksParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PredictLinksParallel(g, 5, similarity.Jaccard)
+		similarity.PredictLinksParallel(context.Background(), g, 5, func(gg graph.Undirected, u, v int64) float64 {
+			return similarity.Jaccard(context.Background(), gg, u, v)
+		})
 	}
 }
 
@@ -845,7 +853,9 @@ func BenchmarkPredictLinksParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		similarity.PredictLinksParallel(g, 5, similarity.Jaccard)
+		similarity.PredictLinksParallel(context.Background(), g, 5, func(gg graph.Undirected, u, v int64) float64 {
+			return similarity.Jaccard(context.Background(), gg, u, v)
+		})
 	}
 }
 
@@ -856,7 +866,7 @@ func BenchmarkBFSPath_Memory_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.BFSPath(g, 0, 999)
+		traverse.BFSPath(context.Background(), g, 0, 999)
 	}
 }
 
@@ -871,7 +881,7 @@ func BenchmarkBFSPath_Disk_1K(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		traverse.BFSPath(g, 0, 999)
+		traverse.BFSPath(context.Background(), g, 0, 999)
 	}
 }
 
@@ -950,7 +960,7 @@ func BenchmarkNode2VecParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalksParallel(g, embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}, int64(i))
+		embedding.Node2VecWalksParallel(context.Background(), g, embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}, int64(i))
 	}
 }
 
@@ -965,7 +975,7 @@ func BenchmarkNode2VecParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalksParallel(g, embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}, int64(i))
+		embedding.Node2VecWalksParallel(context.Background(), g, embedding.WalkParams{WalkLength: 10, WalksPerNode: 3, P: 1, Q: 1}, int64(i))
 	}
 }
 
@@ -976,7 +986,7 @@ func BenchmarkDeepWalk_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.DeepWalkWalks(g, 10, 3, rand.New(rand.NewSource(int64(i))))
+		embedding.DeepWalkWalks(context.Background(), g, 10, 3, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -991,7 +1001,7 @@ func BenchmarkDeepWalk_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.DeepWalkWalks(g, 10, 3, rand.New(rand.NewSource(int64(i))))
+		embedding.DeepWalkWalks(context.Background(), g, 10, 3, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -1002,7 +1012,7 @@ func BenchmarkDeepWalkParallel_Memory_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.DeepWalkWalksParallel(g, 10, 3, int64(i))
+		embedding.DeepWalkWalksParallel(context.Background(), g, 10, 3, int64(i))
 	}
 }
 
@@ -1017,7 +1027,7 @@ func BenchmarkDeepWalkParallel_Disk_100(b *testing.B) {
 	defer g.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.DeepWalkWalksParallel(g, 10, 3, int64(i))
+		embedding.DeepWalkWalksParallel(context.Background(), g, 10, 3, int64(i))
 	}
 }
 
@@ -1123,7 +1133,7 @@ func BenchmarkHopcroftKarp_Memory_100(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		matching.HopcroftKarp(g, left)
+		matching.HopcroftKarp(context.Background(), g, left)
 	}
 }
 
@@ -1142,7 +1152,7 @@ func BenchmarkHopcroftKarp_Disk_100(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		matching.HopcroftKarp(g, left)
+		matching.HopcroftKarp(context.Background(), g, left)
 	}
 }
 

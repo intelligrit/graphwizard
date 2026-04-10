@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -44,7 +45,7 @@ func TestTSP_ForceTwoOptImprovement(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(2), 1.42))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(3), 1.42))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	// Optimal tour = 4.0 (follow the square). 2-opt should find it.
 	if math.Abs(result.Weight-4.0) > 0.01 {
 		t.Errorf("expected tour weight ~4.0, got %f", result.Weight)
@@ -72,7 +73,7 @@ func TestTSP_SixNodeForce2Opt(t *testing.T) {
 		}
 	}
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	// Optimal tour follows the hexagon: weight = 6.
 	if result.Weight > 6.01 {
 		t.Errorf("expected tour weight ~6.0, got %f", result.Weight)

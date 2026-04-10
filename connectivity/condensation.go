@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/topo"
 )
@@ -21,7 +23,7 @@ type CondensedEdge struct {
 // The condensation is always a DAG (directed acyclic graph).
 //
 // Reference: Standard algorithm — compute SCCs via Tarjan, then contract.
-func Condensation(g graph.Directed) (components [][]int64, edges []CondensedEdge, nodeToSCC map[int64]int) {
+func Condensation(ctx context.Context, g graph.Directed) (components [][]int64, edges []CondensedEdge, nodeToSCC map[int64]int) {
 	// Compute SCCs.
 	sccs := topo.TarjanSCC(g)
 

@@ -3,6 +3,7 @@
 package similarity
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -14,7 +15,7 @@ func TestSimRank_Symmetric(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	sim := SimRank(g, 0.8, 10)
+	sim := SimRank(context.Background(), g, 0.8, 10)
 
 	// Self-similarity = 1.
 	if sim[[2]int64{0, 0}] != 1.0 {
@@ -38,7 +39,7 @@ func TestSimRank_WithInLinks(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(1)))
 
-	sim := SimRank(g, 0.8, 10)
+	sim := SimRank(context.Background(), g, 0.8, 10)
 	// Nodes 0 and 1 share in-neighbors {2, 3}, so sim(0,1) > 0.
 	key := [2]int64{0, 1}
 	if sim[key] <= 0 {
@@ -48,7 +49,7 @@ func TestSimRank_WithInLinks(t *testing.T) {
 
 func TestSimRank_Empty(t *testing.T) {
 	g := simple.NewDirectedGraph()
-	sim := SimRank(g, 0.8, 10)
+	sim := SimRank(context.Background(), g, 0.8, 10)
 	if len(sim) != 0 {
 		t.Errorf("expected empty, got %d entries", len(sim))
 	}

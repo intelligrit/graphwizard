@@ -3,6 +3,7 @@
 package benchmark
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"testing"
@@ -23,8 +24,8 @@ func TestApproximateBetweenness_Correctness(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 
 	// Full sampling (k=34) should approximate exact betweenness.
-	approx := centrality.ApproximateBetweenness(g, 34, rng)
-	exact := centrality.Betweenness(g)
+	approx := centrality.ApproximateBetweenness(context.Background(), g, 34, rng)
+	exact := centrality.Betweenness(context.Background(), g)
 
 	// Top-ranked node should be the same.
 	topApprox := topNode(approx)
@@ -47,7 +48,7 @@ func TestApproximateBetweenness_Sampled(t *testing.T) {
 	g := BarabasiAlbert(1000, 3, rng)
 
 	rng2 := rand.New(rand.NewSource(42))
-	scores := centrality.ApproximateBetweenness(g, 100, rng2)
+	scores := centrality.ApproximateBetweenness(context.Background(), g, 100, rng2)
 	if len(scores) != 1000 {
 		t.Errorf("expected 1000 scores, got %d", len(scores))
 	}
@@ -61,7 +62,7 @@ func TestApproximateBetweenness_Sampled(t *testing.T) {
 func TestApproximateBetweenness_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(42))
-	scores := centrality.ApproximateBetweenness(g, 10, rng)
+	scores := centrality.ApproximateBetweenness(context.Background(), g, 10, rng)
 	if len(scores) != 0 {
 		t.Errorf("expected empty, got %d", len(scores))
 	}
@@ -70,8 +71,8 @@ func TestApproximateBetweenness_Empty(t *testing.T) {
 func TestTriangleCountParallel_MatchesSequential(t *testing.T) {
 	g := KarateClub()
 
-	seqNodes, seqTotal := structure.TriangleCount(g)
-	parNodes, parTotal := structure.TriangleCountParallel(g)
+	seqNodes, seqTotal := structure.TriangleCount(context.Background(), g)
+	parNodes, parTotal := structure.TriangleCountParallel(context.Background(), g)
 
 	if seqTotal != parTotal {
 		t.Errorf("total mismatch: seq=%d par=%d", seqTotal, parTotal)
@@ -86,8 +87,8 @@ func TestTriangleCountParallel_MatchesSequential(t *testing.T) {
 func TestClusteringCoefficientParallel_MatchesSequential(t *testing.T) {
 	g := KarateClub()
 
-	seq := structure.ClusteringCoefficient(g)
-	par := structure.ClusteringCoefficientParallel(g)
+	seq := structure.ClusteringCoefficient(context.Background(), g)
+	par := structure.ClusteringCoefficientParallel(context.Background(), g)
 
 	for id, sc := range seq {
 		if math.Abs(par[id]-sc) > 1e-10 {
@@ -99,7 +100,7 @@ func TestClusteringCoefficientParallel_MatchesSequential(t *testing.T) {
 func TestNode2VecWalksParallel_Structure(t *testing.T) {
 	g := KarateClub()
 
-	walks := embedding.Node2VecWalksParallel(g, embedding.WalkParams{
+	walks := embedding.Node2VecWalksParallel(context.Background(), g, embedding.WalkParams{
 		WalkLength:   10,
 		WalksPerNode: 3,
 		P:            1.0,
@@ -121,8 +122,8 @@ func TestNode2VecWalksParallel_Structure(t *testing.T) {
 func TestEccentricityParallel_MatchesSequential(t *testing.T) {
 	g := KarateClub()
 
-	seq := centrality.Eccentricity(g)
-	par := centrality.EccentricityParallel(g)
+	seq := centrality.Eccentricity(context.Background(), g)
+	par := centrality.EccentricityParallel(context.Background(), g)
 
 	for id, sc := range seq {
 		if math.Abs(par[id]-sc) > 1e-10 {
@@ -133,8 +134,8 @@ func TestEccentricityParallel_MatchesSequential(t *testing.T) {
 
 func TestDiameterParallel_MatchesSequential(t *testing.T) {
 	g := KarateClub()
-	seq := centrality.Diameter(g)
-	par := centrality.DiameterParallel(g)
+	seq := centrality.Diameter(context.Background(), g)
+	par := centrality.DiameterParallel(context.Background(), g)
 	if seq != par {
 		t.Errorf("diameter mismatch: seq=%.0f par=%.0f", seq, par)
 	}
@@ -144,8 +145,8 @@ func TestJaccardAllParallel_MatchesSequential(t *testing.T) {
 	rng := rand.New(rand.NewSource(42))
 	g := ErdosRenyi(50, 0.2, rng)
 
-	seq := similarity.JaccardAll(g, 0.1)
-	par := similarity.JaccardAllParallel(g, 0.1)
+	seq := similarity.JaccardAll(context.Background(), g, 0.1)
+	par := similarity.JaccardAllParallel(context.Background(), g, 0.1)
 
 	if len(seq) != len(par) {
 		t.Errorf("count mismatch: seq=%d par=%d", len(seq), len(par))
@@ -159,7 +160,7 @@ func BenchmarkTriangleCount_Sequential_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 5, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCount(g)
+		structure.TriangleCount(context.Background(), g)
 	}
 }
 
@@ -168,7 +169,7 @@ func BenchmarkTriangleCount_Parallel_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 5, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.TriangleCountParallel(g)
+		structure.TriangleCountParallel(context.Background(), g)
 	}
 }
 
@@ -177,7 +178,7 @@ func BenchmarkClusteringCoefficient_Sequential_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficient(g)
+		structure.ClusteringCoefficient(context.Background(), g)
 	}
 }
 
@@ -186,7 +187,7 @@ func BenchmarkClusteringCoefficient_Parallel_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		structure.ClusteringCoefficientParallel(g)
+		structure.ClusteringCoefficientParallel(context.Background(), g)
 	}
 }
 
@@ -196,7 +197,7 @@ func BenchmarkNode2Vec_Sequential_1K(b *testing.B) {
 	params := embedding.WalkParams{WalkLength: 20, WalksPerNode: 5, P: 1, Q: 1}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalks(g, params, rand.New(rand.NewSource(int64(i))))
+		embedding.Node2VecWalks(context.Background(), g, params, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -205,7 +206,7 @@ func BenchmarkNode2Vec_Parallel_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		embedding.Node2VecWalksParallel(g, embedding.WalkParams{WalkLength: 20, WalksPerNode: 5, P: 1, Q: 1}, int64(i))
+		embedding.Node2VecWalksParallel(context.Background(), g, embedding.WalkParams{WalkLength: 20, WalksPerNode: 5, P: 1, Q: 1}, int64(i))
 	}
 }
 
@@ -214,7 +215,7 @@ func BenchmarkEccentricity_Sequential_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Eccentricity(g)
+		centrality.Eccentricity(context.Background(), g)
 	}
 }
 
@@ -223,7 +224,7 @@ func BenchmarkEccentricity_Parallel_100(b *testing.B) {
 	g := BarabasiAlbert(100, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.EccentricityParallel(g)
+		centrality.EccentricityParallel(context.Background(), g)
 	}
 }
 
@@ -232,7 +233,7 @@ func BenchmarkApproxBetweenness_1K_k100(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.ApproximateBetweenness(g, 100, rand.New(rand.NewSource(int64(i))))
+		centrality.ApproximateBetweenness(context.Background(), g, 100, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -241,7 +242,7 @@ func BenchmarkExactBetweenness_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Betweenness(g)
+		centrality.Betweenness(context.Background(), g)
 	}
 }
 
@@ -252,7 +253,7 @@ func BenchmarkLeiden_Sequential_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.Leiden(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.Leiden(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -261,7 +262,7 @@ func BenchmarkLeiden_Parallel_100(b *testing.B) {
 	g := TwoClusterGraph(50, 0.3, 0.01, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		community.LeidenParallel(g, 1.0, rand.New(rand.NewSource(int64(i))))
+		community.LeidenParallel(context.Background(), g, 1.0, rand.New(rand.NewSource(int64(i))))
 	}
 }
 
@@ -271,7 +272,7 @@ func BenchmarkKatz_Sequential_1K(b *testing.B) {
 	dg := toDirected(ug)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.Katz(dg, 0.01, 1.0, 1e-6, 50)
+		centrality.Katz(context.Background(), dg, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -281,7 +282,7 @@ func BenchmarkKatz_Parallel_1K(b *testing.B) {
 	dg := toDirected(ug)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		centrality.KatzParallel(dg, 0.01, 1.0, 1e-6, 50)
+		centrality.KatzParallel(context.Background(), dg, 0.01, 1.0, 1e-6, 50)
 	}
 }
 
@@ -290,7 +291,7 @@ func BenchmarkBridges_Sequential_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.Bridges(g)
+		connectivity.Bridges(context.Background(), g)
 	}
 }
 
@@ -299,7 +300,7 @@ func BenchmarkBridges_Parallel_1K(b *testing.B) {
 	g := BarabasiAlbert(1000, 3, rng)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connectivity.BridgesParallel(g)
+		connectivity.BridgesParallel(context.Background(), g)
 	}
 }
 

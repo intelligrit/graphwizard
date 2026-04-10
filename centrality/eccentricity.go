@@ -3,8 +3,10 @@
 package centrality
 
 import (
+	"context"
 	"math"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/path"
 )
@@ -14,13 +16,21 @@ import (
 // from that node to any other reachable node.
 //
 // Nodes with no outgoing paths have eccentricity 0.
-func Eccentricity(g graph.Graph) map[int64]float64 {
+func Eccentricity(ctx context.Context, g graph.Graph) map[int64]float64 {
 	allPaths := path.DijkstraAllPaths(g)
 	nodes := g.Nodes()
 	result := make(map[int64]float64)
 
+	// Collect node IDs to know the total for progress reporting.
+	var ids []int64
 	for nodes.Next() {
-		u := nodes.Node()
+		ids = append(ids, nodes.Node().ID())
+	}
+	n := len(ids)
+
+	for i, uid := range ids {
+		progress.Report(ctx, progress.Progress{Phase: "nodes", Step: i, Total: n})
+		u := g.Node(uid)
 		maxDist := 0.0
 		inner := g.Nodes()
 		for inner.Next() {
@@ -33,7 +43,7 @@ func Eccentricity(g graph.Graph) map[int64]float64 {
 				maxDist = w
 			}
 		}
-		result[u.ID()] = maxDist
+		result[uid] = maxDist
 	}
 
 	return result
@@ -43,8 +53,8 @@ func Eccentricity(g graph.Graph) map[int64]float64 {
 // all nodes. This is the longest shortest path between any two nodes.
 //
 // Returns 0 for empty graphs or graphs with no edges.
-func Diameter(g graph.Graph) float64 {
-	ecc := Eccentricity(g)
+func Diameter(ctx context.Context, g graph.Graph) float64 {
+	ecc := Eccentricity(ctx, g)
 	d := 0.0
 	for _, e := range ecc {
 		if e > d {
@@ -56,8 +66,8 @@ func Diameter(g graph.Graph) float64 {
 
 // Radius returns the radius of a graph: the minimum eccentricity across all
 // nodes. Returns +Inf for empty graphs.
-func Radius(g graph.Graph) float64 {
-	ecc := Eccentricity(g)
+func Radius(ctx context.Context, g graph.Graph) float64 {
+	ecc := Eccentricity(ctx, g)
 	r := math.Inf(1)
 	for _, e := range ecc {
 		if e < r {

@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestTSP_Triangle(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(0), 1))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 3 {
 		t.Fatalf("expected tour of 3 nodes, got %d", len(result.Tour))
 	}
@@ -36,7 +37,7 @@ func TestTSP_Square(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(2), 1.5))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(3), 1.5))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 4 {
 		t.Fatalf("expected tour of 4 nodes, got %d", len(result.Tour))
 	}
@@ -50,7 +51,7 @@ func TestTSP_SingleNode(t *testing.T) {
 	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
 	g.AddNode(simple.Node(0))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 1 {
 		t.Fatalf("expected tour of 1 node, got %d", len(result.Tour))
 	}
@@ -63,7 +64,7 @@ func TestTSP_TwoNodes(t *testing.T) {
 	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 5))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 2 {
 		t.Fatalf("expected tour of 2 nodes, got %d", len(result.Tour))
 	}

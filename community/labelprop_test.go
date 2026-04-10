@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -24,7 +25,7 @@ func TestLabelPropagation_TwoClusters(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(4), simple.Node(5)))
 
 	rng := rand.New(rand.NewSource(42))
-	labels := LabelPropagation(g, 100, rng)
+	labels := LabelPropagation(context.Background(), g, 100, rng)
 
 	if labels[0] != labels[1] {
 		t.Errorf("nodes 0 and 1 should share a label")
@@ -40,7 +41,7 @@ func TestLabelPropagation_TwoClusters(t *testing.T) {
 func TestLabelPropagation_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(42))
-	labels := LabelPropagation(g, 100, rng)
+	labels := LabelPropagation(context.Background(), g, 100, rng)
 	if len(labels) != 0 {
 		t.Errorf("expected empty, got %v", labels)
 	}
@@ -52,7 +53,7 @@ func TestLabelPropagation_Isolated(t *testing.T) {
 	g.AddNode(simple.Node(1))
 
 	rng := rand.New(rand.NewSource(42))
-	labels := LabelPropagation(g, 100, rng)
+	labels := LabelPropagation(context.Background(), g, 100, rng)
 	if labels[0] == labels[1] {
 		t.Error("isolated nodes should keep different labels")
 	}

@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math"
 
 	"gonum.org/v1/gonum/graph"
@@ -19,7 +20,7 @@ import (
 // Lower values concentrate scores near the seed.
 //
 // Reference: T. Haveliwala, "Topic-Sensitive PageRank", WWW 2002.
-func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, maxIter int) map[int64]float64 {
+func PersonalizedPageRank(ctx context.Context, g graph.Directed, seed int64, damping, tol float64, maxIter int) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -100,7 +101,7 @@ func PersonalizedPageRank(g graph.Directed, seed int64, damping, tol float64, ma
 
 // PersonalizedPageRankUndirected runs PPR on an undirected graph by treating
 // each undirected edge as two directed edges.
-func PersonalizedPageRankUndirected(g graph.Undirected, seed int64, damping, tol float64, maxIter int) map[int64]float64 {
+func PersonalizedPageRankUndirected(ctx context.Context, g graph.Undirected, seed int64, damping, tol float64, maxIter int) map[int64]float64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {

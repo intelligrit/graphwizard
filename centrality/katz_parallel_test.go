@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -19,8 +20,8 @@ func TestKatzParallel_MatchesSequential(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	seq := Katz(g, 0.1, 1.0, 1e-10, 200)
-	par := KatzParallel(g, 0.1, 1.0, 1e-10, 200)
+	seq := Katz(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+	par := KatzParallel(context.Background(), g, 0.1, 1.0, 1e-10, 200)
 
 	for id, sv := range seq {
 		pv := par[id]
@@ -32,7 +33,7 @@ func TestKatzParallel_MatchesSequential(t *testing.T) {
 
 func TestKatzParallel_Empty(t *testing.T) {
 	g := simple.NewDirectedGraph()
-	scores := KatzParallel(g, 0.1, 1.0, 1e-8, 100)
+	scores := KatzParallel(context.Background(), g, 0.1, 1.0, 1e-8, 100)
 	if len(scores) != 0 {
 		t.Errorf("expected empty map, got %v", scores)
 	}
@@ -44,8 +45,8 @@ func TestKatzUndirectedParallel_MatchesSequential(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	seq := KatzUndirected(g, 0.1, 1.0, 1e-10, 200)
-	par := KatzUndirectedParallel(g, 0.1, 1.0, 1e-10, 200)
+	seq := KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+	par := KatzUndirectedParallel(context.Background(), g, 0.1, 1.0, 1e-10, 200)
 
 	for id, sv := range seq {
 		pv := par[id]

@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestMaxFlow_Simple(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 3))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 2))
 
-	f := MaxFlow(g, 0, 2, 1e-9)
+	f := MaxFlow(context.Background(), g, 0, 2, 1e-9)
 	if math.Abs(f-2.0) > 1e-9 {
 		t.Errorf("expected max flow 2.0, got %f", f)
 	}
@@ -30,7 +31,7 @@ func TestMaxFlow_Parallel(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 2))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 2))
 
-	f := MaxFlow(g, 0, 2, 1e-9)
+	f := MaxFlow(context.Background(), g, 0, 2, 1e-9)
 	if math.Abs(f-5.0) > 1e-9 {
 		t.Errorf("expected max flow 5.0, got %f", f)
 	}
@@ -41,7 +42,7 @@ func TestMaxFlow_NoPath(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(0), simple.Node(1), 5))
 	g.AddNode(simple.Node(2))
 
-	f := MaxFlow(g, 0, 2, 1e-9)
+	f := MaxFlow(context.Background(), g, 0, 2, 1e-9)
 	if f != 0 {
 		t.Errorf("expected max flow 0, got %f", f)
 	}

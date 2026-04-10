@@ -3,6 +3,7 @@
 package embedding
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestNode2VecWalks_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := Node2VecWalks(g, WalkParams{
+	walks := Node2VecWalks(context.Background(), g, WalkParams{
 		WalkLength:   5,
 		WalksPerNode: 2,
 		P:            1.0,
@@ -42,7 +43,7 @@ func TestNode2VecWalks_BFSBias(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := Node2VecWalks(g, WalkParams{
+	walks := Node2VecWalks(context.Background(), g, WalkParams{
 		WalkLength:   10,
 		WalksPerNode: 1,
 		P:            1.0,
@@ -60,7 +61,7 @@ func TestNode2VecWalks_IsolatedNode(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := Node2VecWalks(g, WalkParams{
+	walks := Node2VecWalks(context.Background(), g, WalkParams{
 		WalkLength:   5,
 		WalksPerNode: 1,
 		P:            1.0,
@@ -90,7 +91,7 @@ func TestDeepWalkWalks_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := DeepWalkWalks(g, 5, 2, rng)
+	walks := DeepWalkWalks(context.Background(), g, 5, 2, rng)
 
 	if len(walks) != 6 {
 		t.Fatalf("expected 6 walks, got %d", len(walks))
@@ -100,7 +101,7 @@ func TestDeepWalkWalks_Triangle(t *testing.T) {
 func TestNode2VecWalks_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(42))
-	walks := Node2VecWalks(g, WalkParams{WalkLength: 5, WalksPerNode: 1, P: 1, Q: 1}, rng)
+	walks := Node2VecWalks(context.Background(), g, WalkParams{WalkLength: 5, WalksPerNode: 1, P: 1, Q: 1}, rng)
 	if len(walks) != 0 {
 		t.Errorf("expected 0 walks for empty graph, got %d", len(walks))
 	}

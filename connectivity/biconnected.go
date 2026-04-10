@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -21,7 +23,7 @@ type Edge struct {
 //
 // Reference: J. Hopcroft and R. Tarjan, "Algorithm 447: efficient algorithms
 // for graph manipulation", Communications of the ACM, 1973.
-func BiconnectedComponents(g graph.Undirected) [][]Edge {
+func BiconnectedComponents(ctx context.Context, g graph.Undirected) [][]Edge {
 	disc := make(map[int64]int)
 	low := make(map[int64]int)
 	visited := make(map[int64]bool)
@@ -138,7 +140,7 @@ func collectNeighborIDs(g graph.Undirected, id int64) []int64 {
 // ArticulationPoints returns all articulation points (cut vertices) in an
 // undirected graph. An articulation point is a node whose removal disconnects
 // the graph.
-func ArticulationPoints(g graph.Undirected) []int64 {
+func ArticulationPoints(ctx context.Context, g graph.Undirected) []int64 {
 	disc := make(map[int64]int)
 	low := make(map[int64]int)
 	visited := make(map[int64]bool)

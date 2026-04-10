@@ -3,6 +3,7 @@
 package embedding_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -16,7 +17,7 @@ func ExampleNode2VecWalks() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := embedding.Node2VecWalks(g, embedding.WalkParams{
+	walks := embedding.Node2VecWalks(context.Background(), g, embedding.WalkParams{
 		WalkLength:   5,
 		WalksPerNode: 2,
 		P:            1.0,
@@ -34,8 +35,8 @@ func ExampleEmbed() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := embedding.DeepWalkWalks(g, 10, 20, rng)
-	emb := embedding.Embed(walks, []int64{0, 1, 2}, 2, 3)
+	walks := embedding.DeepWalkWalks(context.Background(), g, 10, 20, rng)
+	emb := embedding.Embed(context.Background(), walks, []int64{0, 1, 2}, 2, 3)
 
 	fmt.Printf("dim: %d\n", len(emb[0]))
 	// Output: dim: 2
@@ -46,7 +47,7 @@ func ExampleNode2VecWalksParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	walks := embedding.Node2VecWalksParallel(g, embedding.WalkParams{
+	walks := embedding.Node2VecWalksParallel(context.Background(), g, embedding.WalkParams{
 		WalkLength:   5,
 		WalksPerNode: 2,
 		P:            1.0,
@@ -63,7 +64,7 @@ func ExampleDeepWalkWalksParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	walks := embedding.DeepWalkWalksParallel(g, 10, 3, 42)
+	walks := embedding.DeepWalkWalksParallel(context.Background(), g, 10, 3, 42)
 	fmt.Printf("walks: %d\n", len(walks))
 	// Output: walks: 9
 }

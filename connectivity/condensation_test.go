@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -16,7 +17,7 @@ func TestCondensation_TwoSCCs(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	comps, edges, nodeToSCC := Condensation(g)
+	comps, edges, nodeToSCC := Condensation(context.Background(), g)
 	if len(comps) != 2 {
 		t.Fatalf("expected 2 SCCs, got %d", len(comps))
 	}
@@ -39,7 +40,7 @@ func TestCondensation_DAG(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	comps, edges, _ := Condensation(g)
+	comps, edges, _ := Condensation(context.Background(), g)
 	if len(comps) != 3 {
 		t.Fatalf("expected 3 SCCs (each node), got %d", len(comps))
 	}
@@ -53,7 +54,7 @@ func TestCondensation_SingleSCC(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
 
-	comps, edges, _ := Condensation(g)
+	comps, edges, _ := Condensation(context.Background(), g)
 	if len(comps) != 1 {
 		t.Fatalf("expected 1 SCC, got %d", len(comps))
 	}

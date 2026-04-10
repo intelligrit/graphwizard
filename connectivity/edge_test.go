@@ -3,6 +3,7 @@
 package connectivity
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -15,7 +16,7 @@ func TestBiconnectedComponents_Path(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	if len(comps) != 3 {
 		t.Fatalf("expected 3 biconnected components in path, got %d", len(comps))
 	}
@@ -27,7 +28,7 @@ func TestArticulationPoints_Path(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	aps := ArticulationPoints(g)
+	aps := ArticulationPoints(context.Background(), g)
 	if len(aps) != 1 || aps[0] != 1 {
 		t.Errorf("expected [1], got %v", aps)
 	}
@@ -40,7 +41,7 @@ func TestArticulationPoints_Star(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 
-	aps := ArticulationPoints(g)
+	aps := ArticulationPoints(context.Background(), g)
 	if len(aps) != 1 || aps[0] != 0 {
 		t.Errorf("expected [0], got %v", aps)
 	}
@@ -77,7 +78,7 @@ func TestUnionFind_RankDifference(t *testing.T) {
 
 func TestBiconnectedComponents_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	if len(comps) != 0 {
 		t.Errorf("expected 0 components, got %d", len(comps))
 	}
@@ -85,7 +86,7 @@ func TestBiconnectedComponents_Empty(t *testing.T) {
 
 func TestArticulationPoints_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	aps := ArticulationPoints(g)
+	aps := ArticulationPoints(context.Background(), g)
 	if len(aps) != 0 {
 		t.Errorf("expected 0 APs, got %d", len(aps))
 	}
@@ -98,7 +99,7 @@ func TestBiconnectedComponents_Star(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	if len(comps) != 3 {
 		t.Fatalf("expected 3 biconnected components in star, got %d", len(comps))
 	}
@@ -108,7 +109,7 @@ func TestBiconnectedComponents_SingleEdge(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 
-	comps := BiconnectedComponents(g)
+	comps := BiconnectedComponents(context.Background(), g)
 	if len(comps) != 1 {
 		t.Fatalf("expected 1 component, got %d", len(comps))
 	}

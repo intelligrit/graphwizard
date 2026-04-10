@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestTSP_NoImprovement2Opt(t *testing.T) {
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(1), simple.Node(2), 1))
 	g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(2), simple.Node(0), 1))
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if math.Abs(result.Weight-3.0) > epsilon {
 		t.Errorf("expected weight 3.0, got %f", result.Weight)
 	}
@@ -35,7 +36,7 @@ func TestTSP_FiveNodeComplete(t *testing.T) {
 		g.SetWeightedEdge(g.NewWeightedEdge(simple.Node(k[0]), simple.Node(k[1]), w))
 	}
 
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 5 {
 		t.Fatalf("expected 5 nodes, got %d", len(result.Tour))
 	}
@@ -49,7 +50,7 @@ func TestTSP_FiveNodeComplete(t *testing.T) {
 
 func TestTSP_EmptyGraph(t *testing.T) {
 	g := simple.NewWeightedUndirectedGraph(0, math.Inf(1))
-	result := TSP(g)
+	result := TSP(context.Background(), g)
 	if len(result.Tour) != 0 {
 		t.Errorf("expected empty tour, got %d nodes", len(result.Tour))
 	}

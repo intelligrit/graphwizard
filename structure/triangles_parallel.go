@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,7 +16,7 @@ import (
 //
 // The graph implementation must be safe for concurrent reads (e.g.,
 // simple.UndirectedGraph).
-func TriangleCountParallel(g graph.Undirected) (perNode map[int64]int, total int) {
+func TriangleCountParallel(ctx context.Context, g graph.Undirected) (perNode map[int64]int, total int) {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {

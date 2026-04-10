@@ -3,6 +3,8 @@
 package connectivity
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/topo"
 )
@@ -11,7 +13,7 @@ import (
 // graph as slices of node IDs.
 //
 // Wraps gonum/graph/topo.ConnectedComponents.
-func ConnectedComponents(g graph.Undirected) [][]int64 {
+func ConnectedComponents(ctx context.Context, g graph.Undirected) [][]int64 {
 	raw := topo.ConnectedComponents(g)
 	result := make([][]int64, len(raw))
 	for i, comp := range raw {
@@ -28,7 +30,7 @@ func ConnectedComponents(g graph.Undirected) [][]int64 {
 // directed graph as slices of node IDs.
 //
 // Wraps gonum/graph/topo.TarjanSCC.
-func StronglyConnectedComponents(g graph.Directed) [][]int64 {
+func StronglyConnectedComponents(ctx context.Context, g graph.Directed) [][]int64 {
 	raw := topo.TarjanSCC(g)
 	result := make([][]int64, len(raw))
 	for i, comp := range raw {

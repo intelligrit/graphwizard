@@ -3,8 +3,10 @@
 package embedding
 
 import (
+	"context"
 	"math/rand"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -26,7 +28,7 @@ type WalkParams struct {
 //
 // Reference: A. Grover and J. Leskovec, "node2vec: Scalable Feature Learning
 // for Networks", KDD 2016.
-func Node2VecWalks(g graph.Undirected, params WalkParams, rng *rand.Rand) [][]int64 {
+func Node2VecWalks(ctx context.Context, g graph.Undirected, params WalkParams, rng *rand.Rand) [][]int64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -51,6 +53,7 @@ func Node2VecWalks(g graph.Undirected, params WalkParams, rng *rand.Rand) [][]in
 
 	var walks [][]int64
 	for w := 0; w < params.WalksPerNode; w++ {
+		progress.Report(ctx, progress.Progress{Phase: "walks", Step: w, Total: params.WalksPerNode})
 		perm := rng.Perm(len(ids))
 		for _, idx := range perm {
 			start := ids[idx]
@@ -116,8 +119,8 @@ func Node2VecWalks(g graph.Undirected, params WalkParams, rng *rand.Rand) [][]in
 //
 // Reference: B. Perozzi, R. Al-Rfou, S. Skiena, "DeepWalk: Online Learning
 // of Social Representations", KDD 2014.
-func DeepWalkWalks(g graph.Undirected, walkLength, walksPerNode int, rng *rand.Rand) [][]int64 {
-	return Node2VecWalks(g, WalkParams{
+func DeepWalkWalks(ctx context.Context, g graph.Undirected, walkLength, walksPerNode int, rng *rand.Rand) [][]int64 {
+	return Node2VecWalks(ctx, g, WalkParams{
 		WalkLength:   walkLength,
 		WalksPerNode: walksPerNode,
 		P:            1.0,

@@ -3,6 +3,8 @@
 package centrality
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/network"
 	"gonum.org/v1/gonum/graph/path"
@@ -15,7 +17,7 @@ import (
 // between other node pairs.
 //
 // Wraps gonum/graph/network.Betweenness.
-func Betweenness(g graph.Graph) map[int64]float64 {
+func Betweenness(ctx context.Context, g graph.Graph) map[int64]float64 {
 	return network.Betweenness(g)
 }
 
@@ -24,7 +26,7 @@ func Betweenness(g graph.Graph) map[int64]float64 {
 // precomputed shortest paths (use AllShortestPaths from the paths package).
 //
 // Wraps gonum/graph/network.BetweennessWeighted.
-func BetweennessWeighted(g graph.Weighted, allPaths path.AllShortest) map[int64]float64 {
+func BetweennessWeighted(ctx context.Context, g graph.Weighted, allPaths path.AllShortest) map[int64]float64 {
 	return network.BetweennessWeighted(g, allPaths)
 }
 
@@ -32,7 +34,7 @@ func BetweennessWeighted(g graph.Weighted, allPaths path.AllShortest) map[int64]
 // unweighted graph. The result maps [from, to] node ID pairs to scores.
 //
 // Wraps gonum/graph/network.EdgeBetweenness.
-func EdgeBetweenness(g graph.Graph) map[[2]int64]float64 {
+func EdgeBetweenness(ctx context.Context, g graph.Graph) map[[2]int64]float64 {
 	return network.EdgeBetweenness(g)
 }
 
@@ -40,20 +42,20 @@ func EdgeBetweenness(g graph.Graph) map[[2]int64]float64 {
 // a weighted graph.
 //
 // Wraps gonum/graph/network.EdgeBetweennessWeighted.
-func EdgeBetweennessWeighted(g graph.Weighted, allPaths path.AllShortest) map[[2]int64]float64 {
+func EdgeBetweennessWeighted(ctx context.Context, g graph.Weighted, allPaths path.AllShortest) map[[2]int64]float64 {
 	return network.EdgeBetweennessWeighted(g, allPaths)
 }
 
 // Closeness returns the closeness centrality for each node, keyed by node ID.
 //
 // Wraps gonum/graph/network.Closeness.
-func Closeness(g graph.Graph, allPaths path.AllShortest) map[int64]float64 {
+func Closeness(ctx context.Context, g graph.Graph, allPaths path.AllShortest) map[int64]float64 {
 	return network.Closeness(g, allPaths)
 }
 
 // Harmonic returns the harmonic centrality for each node, keyed by node ID.
 //
 // Wraps gonum/graph/network.Harmonic.
-func Harmonic(g graph.Graph, allPaths path.AllShortest) map[int64]float64 {
+func Harmonic(ctx context.Context, g graph.Graph, allPaths path.AllShortest) map[int64]float64 {
 	return network.Harmonic(g, allPaths)
 }

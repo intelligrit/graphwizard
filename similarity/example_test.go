@@ -3,6 +3,7 @@
 package similarity_test
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -18,7 +19,7 @@ func ExampleJaccard() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(4)))
 
-	score := similarity.Jaccard(g, 0, 1)
+	score := similarity.Jaccard(context.Background(), g, 0, 1)
 	fmt.Printf("J(0,1) = %.4f\n", score)
 	// Output: J(0,1) = 0.3333
 }
@@ -29,7 +30,7 @@ func ExampleOverlap() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	score := similarity.Overlap(g, 0, 1)
+	score := similarity.Overlap(context.Background(), g, 0, 1)
 	fmt.Printf("O(0,1) = %.1f\n", score)
 	// Output: O(0,1) = 1.0
 }
@@ -41,7 +42,7 @@ func ExampleCosine() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
 
-	c := similarity.Cosine(g, 0, 1)
+	c := similarity.Cosine(context.Background(), g, 0, 1)
 	fmt.Printf("Cosine(0,1) = %.1f\n", c)
 	// Output: Cosine(0,1) = 1.0
 }
@@ -52,7 +53,7 @@ func ExampleAdamicAdar() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
 
-	aa := similarity.AdamicAdar(g, 0, 1)
+	aa := similarity.AdamicAdar(context.Background(), g, 0, 1)
 	fmt.Printf("AA(0,1) = %.4f\n", aa)
 	// Output: AA(0,1) = 0.9102
 }
@@ -64,7 +65,7 @@ func ExampleCommonNeighbors() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
 
-	cn := similarity.CommonNeighbors(g, 0, 1)
+	cn := similarity.CommonNeighbors(context.Background(), g, 0, 1)
 	fmt.Printf("CN(0,1) = %d\n", cn)
 	// Output: CN(0,1) = 2
 }
@@ -75,7 +76,7 @@ func ExamplePreferentialAttachment() {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(4)))
 
-	pa := similarity.PreferentialAttachment(g, 0, 1)
+	pa := similarity.PreferentialAttachment(context.Background(), g, 0, 1)
 	fmt.Printf("PA(0,1) = %d\n", pa)
 	// Output: PA(0,1) = 2
 }
@@ -87,9 +88,9 @@ func ExamplePredictLinks() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	scorer := func(g graph.Undirected, u, v int64) float64 {
-		return float64(similarity.CommonNeighbors(g, u, v))
+		return float64(similarity.CommonNeighbors(context.Background(), g, u, v))
 	}
-	preds := similarity.PredictLinks(g, 1, scorer)
+	preds := similarity.PredictLinks(context.Background(), g, 1, scorer)
 	fmt.Printf("predicted: %d-%d (CN=%d)\n", preds[0].A, preds[0].B, int(preds[0].Score))
 	// Output: predicted: 0-2 (CN=1)
 }
@@ -102,7 +103,7 @@ func ExampleSimRank() {
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(0)))
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(1)))
 
-	sim := similarity.SimRank(g, 0.8, 10)
+	sim := similarity.SimRank(context.Background(), g, 0.8, 10)
 	// Nodes 0 and 1 have the same in-neighbors, so they are structurally similar.
 	s := sim[[2]int64{0, 1}]
 	fmt.Printf("sim(0,1) = %.2f\n", s)
@@ -115,7 +116,7 @@ func ExampleJaccardAllParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	results := similarity.JaccardAllParallel(g, 0.1)
+	results := similarity.JaccardAllParallel(context.Background(), g, 0.1)
 	fmt.Printf("pairs above threshold: %d\n", len(results))
 	// Output: pairs above threshold: 3
 }
@@ -126,9 +127,9 @@ func ExamplePredictLinksParallel() {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
 	scorer := func(g graph.Undirected, u, v int64) float64 {
-		return float64(similarity.CommonNeighbors(g, u, v))
+		return float64(similarity.CommonNeighbors(context.Background(), g, u, v))
 	}
-	preds := similarity.PredictLinksParallel(g, 1, scorer)
+	preds := similarity.PredictLinksParallel(context.Background(), g, 1, scorer)
 	a, b := preds[0].A, preds[0].B
 	if a > b {
 		a, b = b, a

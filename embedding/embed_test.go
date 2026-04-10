@@ -3,6 +3,7 @@
 package embedding
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -16,10 +17,10 @@ func TestEmbed_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := DeepWalkWalks(g, 10, 20, rng)
+	walks := DeepWalkWalks(context.Background(), g, 10, 20, rng)
 	nodeIDs := []int64{0, 1, 2}
 
-	emb := Embed(walks, nodeIDs, 2, 3)
+	emb := Embed(context.Background(), walks, nodeIDs, 2, 3)
 	if len(emb) != 3 {
 		t.Fatalf("expected 3 embeddings, got %d", len(emb))
 	}
@@ -32,7 +33,7 @@ func TestEmbed_Triangle(t *testing.T) {
 }
 
 func TestEmbed_Empty(t *testing.T) {
-	emb := Embed(nil, nil, 2, 3)
+	emb := Embed(context.Background(), nil, nil, 2, 3)
 	if len(emb) != 0 {
 		t.Errorf("expected empty embedding for empty input")
 	}
@@ -40,7 +41,7 @@ func TestEmbed_Empty(t *testing.T) {
 
 func TestEmbed_NoWalks(t *testing.T) {
 	nodeIDs := []int64{0, 1}
-	emb := Embed(nil, nodeIDs, 2, 3)
+	emb := Embed(context.Background(), nil, nodeIDs, 2, 3)
 	if len(emb) != 2 {
 		t.Fatalf("expected 2 embeddings, got %d", len(emb))
 	}
@@ -60,11 +61,11 @@ func TestEmbed_DimLargerThanNodes(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 
 	rng := rand.New(rand.NewSource(42))
-	walks := DeepWalkWalks(g, 5, 10, rng)
+	walks := DeepWalkWalks(context.Background(), g, 5, 10, rng)
 	nodeIDs := []int64{0, 1}
 
 	// dim=10 but only 2 nodes — should clamp to 2.
-	emb := Embed(walks, nodeIDs, 10, 3)
+	emb := Embed(context.Background(), walks, nodeIDs, 10, 3)
 	if len(emb) != 2 {
 		t.Fatalf("expected 2 embeddings, got %d", len(emb))
 	}

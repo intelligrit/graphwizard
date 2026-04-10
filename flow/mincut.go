@@ -3,6 +3,9 @@
 package flow
 
 import (
+	"context"
+
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -22,7 +25,7 @@ type MinCutResult struct {
 //
 // Reference: Ford and Fulkerson, "Maximal Flow Through a Network",
 // Canadian Journal of Mathematics, 1956.
-func MinCut(g graph.WeightedDirected, source, target int64, eps float64) MinCutResult {
+func MinCut(ctx context.Context, g graph.WeightedDirected, source, target int64, eps float64) MinCutResult {
 	// Collect nodes.
 	allNodes := make(map[int64]bool)
 	nodes := g.Nodes()
@@ -56,6 +59,7 @@ func MinCut(g graph.WeightedDirected, source, target int64, eps float64) MinCutR
 	// Edmonds-Karp: BFS-based augmenting paths.
 	flow := make(map[[2]int64]float64)
 	totalFlow := 0.0
+	augIter := 0
 
 	for {
 		// BFS to find augmenting path.
@@ -83,6 +87,8 @@ func MinCut(g graph.WeightedDirected, source, target int64, eps float64) MinCutR
 		if !found {
 			break
 		}
+		progress.Report(ctx, progress.Progress{Phase: "augment", Step: augIter, Total: -1})
+		augIter++
 
 		// Find bottleneck.
 		bottleneck := cap[[2]int64{parent[target], target}] // start large

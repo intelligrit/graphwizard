@@ -3,6 +3,7 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestLeidenParallel_TwoCliques(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(3), simple.Node(4)))
 
 	rng := rand.New(rand.NewSource(42))
-	result := LeidenParallel(g, 1.0, rng)
+	result := LeidenParallel(context.Background(), g, 1.0, rng)
 
 	if len(result) != 8 {
 		t.Fatalf("expected 8 assignments, got %d", len(result))
@@ -47,7 +48,7 @@ func TestLeidenParallel_TwoCliques(t *testing.T) {
 func TestLeidenParallel_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(1))
-	result := LeidenParallel(g, 1.0, rng)
+	result := LeidenParallel(context.Background(), g, 1.0, rng)
 	if len(result) != 0 {
 		t.Errorf("expected empty map, got %v", result)
 	}
@@ -57,7 +58,7 @@ func TestLeidenParallel_SingleNode(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.AddNode(simple.Node(0))
 	rng := rand.New(rand.NewSource(1))
-	result := LeidenParallel(g, 1.0, rng)
+	result := LeidenParallel(context.Background(), g, 1.0, rng)
 	if len(result) != 1 {
 		t.Errorf("expected 1 assignment, got %d", len(result))
 	}

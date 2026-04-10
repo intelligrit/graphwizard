@@ -5,6 +5,7 @@
 package benchmark
 
 import (
+	"context"
 	"database/sql"
 	"math/rand"
 	"testing"
@@ -40,28 +41,28 @@ func TestFullPipeline(t *testing.T) {
 
 	// 2. Community detection (Leiden).
 	rng := rand.New(rand.NewSource(42))
-	comms := community.Leiden(g, 1.0, rng)
+	comms := community.Leiden(context.Background(), g, 1.0, rng)
 	t.Logf("communities: %v", comms)
 	if len(comms) != 6 {
 		t.Errorf("expected 6 community assignments, got %d", len(comms))
 	}
 
 	// 3. Betweenness centrality.
-	scores := centrality.Betweenness(g)
+	scores := centrality.Betweenness(context.Background(), g)
 	t.Logf("betweenness: %v", scores)
 	if len(scores) < 1 {
 		t.Errorf("expected at least 1 betweenness score, got %d", len(scores))
 	}
 
 	// 4. Triangle count.
-	perNode, total := structure.TriangleCount(g)
+	perNode, total := structure.TriangleCount(context.Background(), g)
 	t.Logf("triangles: %d total, per-node: %v", total, perNode)
 	if total < 1 {
 		t.Error("expected at least 1 triangle")
 	}
 
 	// 5. Bridge detection.
-	bridges := connectivity.Bridges(g)
+	bridges := connectivity.Bridges(context.Background(), g)
 	t.Logf("bridges: %d", len(bridges))
 
 	// 6. Anomaly detection.

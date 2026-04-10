@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"context"
 	"testing"
 
 	"gonum.org/v1/gonum/graph/simple"
@@ -18,7 +19,7 @@ func TestHopcroftKarp_PerfectMatching(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(4)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(5)))
 
-	m, size := HopcroftKarp(g, []int64{0, 1, 2})
+	m, size := HopcroftKarp(context.Background(), g, []int64{0, 1, 2})
 	if size != 3 {
 		t.Fatalf("expected matching size 3, got %d", size)
 	}
@@ -41,7 +42,7 @@ func TestHopcroftKarp_PartialMatching(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(4)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(4)))
 
-	_, size := HopcroftKarp(g, []int64{0, 1, 2})
+	_, size := HopcroftKarp(context.Background(), g, []int64{0, 1, 2})
 	if size != 2 {
 		t.Fatalf("expected matching size 2, got %d", size)
 	}
@@ -52,7 +53,7 @@ func TestHopcroftKarp_NoEdges(t *testing.T) {
 	g.AddNode(simple.Node(0))
 	g.AddNode(simple.Node(1))
 
-	_, size := HopcroftKarp(g, []int64{0})
+	_, size := HopcroftKarp(context.Background(), g, []int64{0})
 	if size != 0 {
 		t.Fatalf("expected matching size 0, got %d", size)
 	}
@@ -62,7 +63,7 @@ func TestHopcroftKarp_SingleEdge(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 
-	m, size := HopcroftKarp(g, []int64{0})
+	m, size := HopcroftKarp(context.Background(), g, []int64{0})
 	if size != 1 {
 		t.Fatalf("expected matching size 1, got %d", size)
 	}

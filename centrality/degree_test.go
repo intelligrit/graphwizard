@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestDegree_Triangle(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
 
-	scores := Degree(g)
+	scores := Degree(context.Background(), g)
 	// Each node has degree 2, n-1=2, so C_D = 1.0
 	for id, c := range scores {
 		if math.Abs(c-1.0) > epsilon {
@@ -31,7 +32,7 @@ func TestDegree_Star(t *testing.T) {
 		g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(i)))
 	}
 
-	scores := Degree(g)
+	scores := Degree(context.Background(), g)
 	// Center: deg=4, n-1=4, C_D=1.0
 	if math.Abs(scores[0]-1.0) > epsilon {
 		t.Errorf("center: expected C_D=1.0, got %f", scores[0])
@@ -46,7 +47,7 @@ func TestDegree_SingleNode(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	g.AddNode(simple.Node(0))
 
-	scores := Degree(g)
+	scores := Degree(context.Background(), g)
 	if scores[0] != 0 {
 		t.Errorf("single node: expected C_D=0, got %f", scores[0])
 	}
@@ -58,7 +59,7 @@ func TestInDegree_Chain(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := InDegree(g)
+	scores := InDegree(context.Background(), g)
 	if scores[0] != 0 {
 		t.Errorf("node 0: expected in-degree 0, got %f", scores[0])
 	}
@@ -76,7 +77,7 @@ func TestOutDegree_Chain(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	scores := OutDegree(g)
+	scores := OutDegree(context.Background(), g)
 	if math.Abs(scores[0]-0.5) > epsilon {
 		t.Errorf("node 0: expected out-degree 0.5, got %f", scores[0])
 	}

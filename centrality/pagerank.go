@@ -3,6 +3,8 @@
 package centrality
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/network"
 )
@@ -14,13 +16,13 @@ import (
 // rather than jumping to a random node. Tolerance controls convergence.
 //
 // Wraps gonum/graph/network.PageRank.
-func PageRank(g graph.Directed, damping, tol float64) map[int64]float64 {
+func PageRank(ctx context.Context, g graph.Directed, damping, tol float64) map[int64]float64 {
 	return network.PageRank(g, damping, tol)
 }
 
 // PageRankSparse is identical to PageRank but optimized for sparse graphs.
 //
 // Wraps gonum/graph/network.PageRankSparse.
-func PageRankSparse(g graph.Directed, damping, tol float64) map[int64]float64 {
+func PageRankSparse(ctx context.Context, g graph.Directed, damping, tol float64) map[int64]float64 {
 	return network.PageRankSparse(g, damping, tol)
 }

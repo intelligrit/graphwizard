@@ -3,6 +3,8 @@
 package centrality
 
 import (
+	"context"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/network"
 )
@@ -17,7 +19,7 @@ type HITSResult struct {
 // each node in a directed graph.
 //
 // Wraps gonum/graph/network.HITS.
-func HITS(g graph.Directed, tol float64) HITSResult {
+func HITS(ctx context.Context, g graph.Directed, tol float64) HITSResult {
 	raw := network.HITS(g, tol)
 	hub := make(map[int64]float64, len(raw))
 	auth := make(map[int64]float64, len(raw))

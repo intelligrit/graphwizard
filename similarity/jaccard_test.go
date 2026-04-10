@@ -3,6 +3,7 @@
 package similarity
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestJaccard_IdenticalNeighbors(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	score := Jaccard(g, 0, 1)
+	score := Jaccard(context.Background(), g, 0, 1)
 	if math.Abs(score-1.0) > epsilon {
 		t.Errorf("expected J=1.0, got %f", score)
 	}
@@ -31,7 +32,7 @@ func TestJaccard_NoOverlap(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(3)))
 
-	score := Jaccard(g, 0, 1)
+	score := Jaccard(context.Background(), g, 0, 1)
 	if score != 0 {
 		t.Errorf("expected J=0, got %f", score)
 	}
@@ -48,7 +49,7 @@ func TestJaccard_PartialOverlap(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(4)))
 
-	score := Jaccard(g, 0, 1)
+	score := Jaccard(context.Background(), g, 0, 1)
 	if math.Abs(score-1.0/3.0) > epsilon {
 		t.Errorf("expected J=1/3, got %f", score)
 	}
@@ -59,7 +60,7 @@ func TestJaccard_BothIsolated(t *testing.T) {
 	g.AddNode(simple.Node(0))
 	g.AddNode(simple.Node(1))
 
-	score := Jaccard(g, 0, 1)
+	score := Jaccard(context.Background(), g, 0, 1)
 	if score != 0 {
 		t.Errorf("expected J=0 for isolated nodes, got %f", score)
 	}
@@ -76,7 +77,7 @@ func TestJaccardAll_Threshold(t *testing.T) {
 	// In a triangle, N(0)={1,2}, N(1)={0,2}, N(2)={0,1}
 	// J(0,1) = |{2}| / |{0,1,2}| = 1/3
 	// All pairs have J=1/3
-	results := JaccardAll(g, 1.0/3.0-epsilon)
+	results := JaccardAll(context.Background(), g, 1.0/3.0-epsilon)
 	if len(results) != 3 {
 		t.Fatalf("expected 3 pairs at threshold 1/3, got %d", len(results))
 	}
@@ -87,7 +88,7 @@ func TestJaccardAll_Threshold(t *testing.T) {
 	}
 
 	// Nothing at threshold 0.5
-	results = JaccardAll(g, 0.5)
+	results = JaccardAll(context.Background(), g, 0.5)
 	if len(results) != 0 {
 		t.Errorf("expected 0 pairs at threshold 0.5, got %d", len(results))
 	}
@@ -102,7 +103,7 @@ func TestOverlap_PartialOverlap(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
 
-	score := Overlap(g, 0, 1)
+	score := Overlap(context.Background(), g, 0, 1)
 	if math.Abs(score-1.0) > epsilon {
 		t.Errorf("expected O=1.0, got %f", score)
 	}
@@ -113,7 +114,7 @@ func TestOverlap_NoNeighbors(t *testing.T) {
 	g.AddNode(simple.Node(0))
 	g.AddNode(simple.Node(1))
 
-	score := Overlap(g, 0, 1)
+	score := Overlap(context.Background(), g, 0, 1)
 	if score != 0 {
 		t.Errorf("expected O=0 for isolated nodes, got %f", score)
 	}

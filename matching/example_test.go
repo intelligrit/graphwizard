@@ -3,6 +3,7 @@
 package matching_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/intelligrit/graphwizard/matching"
@@ -17,7 +18,7 @@ func ExampleHopcroftKarp() {
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(5)))
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(4)))
 
-	m, size := matching.HopcroftKarp(g, []int64{0, 1, 2})
+	m, size := matching.HopcroftKarp(context.Background(), g, []int64{0, 1, 2})
 	fmt.Printf("matching size: %d\n", size)
 	_ = m
 	// Output: matching size: 3

@@ -3,8 +3,10 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -23,7 +25,7 @@ import (
 // Reference: U. Raghavan, R. Albert, S. Kumara, "Near linear time algorithm
 // to detect community structures in large-scale networks", Physical Review E,
 // 2007.
-func LabelPropagation(g graph.Undirected, maxIter int, rng *rand.Rand) map[int64]int64 {
+func LabelPropagation(ctx context.Context, g graph.Undirected, maxIter int, rng *rand.Rand) map[int64]int64 {
 	nodes := g.Nodes()
 	var ids []int64
 	for nodes.Next() {
@@ -41,6 +43,7 @@ func LabelPropagation(g graph.Undirected, maxIter int, rng *rand.Rand) map[int64
 	}
 
 	for iter := 0; iter < maxIter; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
 		changed := false
 		order := rng.Perm(n)
 

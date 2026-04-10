@@ -3,6 +3,7 @@
 package structure
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestBipartiteProject_Simple(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(11)))
 	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(11)))
 
-	proj := BipartiteProject(g, []int64{0, 1, 2})
+	proj := BipartiteProject(context.Background(), g, []int64{0, 1, 2})
 
 	// 0-1 share org 10 (weight 1).
 	if !proj.HasEdgeBetween(0, 1) {
@@ -48,7 +49,7 @@ func TestBipartiteProject_MultipleShared(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(10)))
 	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(11)))
 
-	proj := BipartiteProject(g, []int64{0, 1})
+	proj := BipartiteProject(context.Background(), g, []int64{0, 1})
 	w, _ := proj.Weight(0, 1)
 	if math.Abs(w-2.0) > epsilon {
 		t.Errorf("expected weight 2.0, got %f", w)
@@ -57,7 +58,7 @@ func TestBipartiteProject_MultipleShared(t *testing.T) {
 
 func TestBipartiteProject_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
-	proj := BipartiteProject(g, nil)
+	proj := BipartiteProject(context.Background(), g, nil)
 	if proj.Nodes().Len() != 0 {
 		t.Error("expected empty projection")
 	}

@@ -3,10 +3,12 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 	"runtime"
 	"sync"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -19,7 +21,8 @@ import (
 //
 // Reference: V. Traag, L. Waltman, N.J. van Eck, "From Louvain to Leiden:
 // guaranteeing well-connected communities", Scientific Reports, 2019.
-func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
+func LeidenParallel(ctx context.Context, g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
+	progress.Report(ctx, progress.Progress{Phase: "build", Step: 0, Total: 1})
 	origIDs, adj, degree, totalWeight := buildWeightedAdj(g)
 	n := len(origIDs)
 	if n == 0 {
@@ -42,6 +45,7 @@ func LeidenParallel(g graph.Undirected, resolution float64, rng *rand.Rand) map[
 	remapBuf := make(map[int]int)
 
 	for iter := 0; iter < 100; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: -1})
 		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, defaultMaxLocalSweeps, rng)
 		refined := refineParallel(adj, degree, comm, curN, rng)
 

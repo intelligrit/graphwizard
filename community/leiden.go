@@ -3,9 +3,11 @@
 package community
 
 import (
+	"context"
 	"math/rand"
 
 	"github.com/intelligrit/graphwizard"
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -23,7 +25,8 @@ type neighbor struct {
 //
 // Reference: V. Traag, L. Waltman, N.J. van Eck, "From Louvain to Leiden:
 // guaranteeing well-connected communities", Scientific Reports, 2019.
-func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
+func Leiden(ctx context.Context, g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]int64 {
+	progress.Report(ctx, progress.Progress{Phase: "build", Step: 0, Total: 1})
 	origIDs, adj, degree, totalWeight := buildWeightedAdj(g)
 	n := len(origIDs)
 	if n == 0 {
@@ -49,6 +52,7 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 	remapBuf := make(map[int]int)
 
 	for iter := 0; iter < 100; iter++ {
+		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: -1})
 		moved := localMove(adj, degree, selfLoops, comm, curN, totalWeight, resolution, defaultMaxLocalSweeps, rng)
 		refined := refine(adj, degree, comm, curN, rng)
 
@@ -94,10 +98,10 @@ func Leiden(g graph.Undirected, resolution float64, rng *rand.Rand) map[int64]in
 }
 
 // defaultMaxLocalSweeps bounds the number of full node sweeps inside
-// localMove. The Leiden paper converges in a handful of sweeps on
-// well-structured data; a hard cap prevents pathological oscillation
-// on hub-heavy graphs (e.g. bipartite provider↔drug networks).
-const defaultMaxLocalSweeps = 10
+// localMove. Three shuffled sweeps break oscillation cycles on hub-heavy
+// graphs while keeping per-iteration cost proportional to edges, not sweeps²
+// (the prior value of 10 caused 3+ hour runtimes on 3M-node bipartite graphs).
+const defaultMaxLocalSweeps = 3
 
 func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int, totalWeight, resolution float64, maxSweeps int, rng *rand.Rand) bool {
 	moved := false
@@ -106,23 +110,37 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 		order[i] = i
 	}
 
-	// Maintain sigmaTot incrementally: O(1) lookup instead of O(n) scan.
-	sigmaTot := make(map[int]float64)
+	// Use slices instead of maps: comm[i] ∈ [0, n) is guaranteed —
+	// initial comm[i] = i, and aggregate() remaps to [0, newN) before each call.
+	// Slice access is ~50x faster than map for hub nodes with 100K+ neighbors.
+	sigmaTot := make([]float64, n)
 	for i := 0; i < n; i++ {
 		sigmaTot[comm[i]] += degree[i]
 	}
 
-	commWeights := make(map[int]float64)
+	// commWeights[c] = total edge weight from the current node to community c.
+	// dirty tracks which entries are non-zero; cleared at the start of each node
+	// to avoid O(n) zeroing on every iteration.
+	commWeights := make([]float64, n)
+	dirty := make([]int, 0, 64)
+
 	for sweep := 0; sweep < maxSweeps; sweep++ {
 		// Reshuffle each sweep to break deterministic oscillation cycles.
 		rng.Shuffle(n, func(i, j int) { order[i], order[j] = order[j], order[i] })
 		changed := false
 		for _, i := range order {
-			for k := range commWeights {
-				delete(commWeights, k)
+			// Clear only entries written by the previous node.
+			for _, d := range dirty {
+				commWeights[d] = 0
 			}
+			dirty = dirty[:0]
+
 			for _, nb := range adj[i] {
-				commWeights[comm[nb.node]] += nb.weight
+				c := comm[nb.node]
+				if commWeights[c] == 0 {
+					dirty = append(dirty, c)
+				}
+				commWeights[c] += nb.weight
 			}
 
 			oldComm := comm[i]
@@ -137,10 +155,11 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 				continue
 			}
 
-			for c, wc := range commWeights {
+			for _, c := range dirty {
 				if c == oldComm {
 					continue
 				}
+				wc := commWeights[c]
 				cSigmaTot := sigmaTot[c]
 				delta := (wc-wOld)/m - resolution*degree[i]*(cSigmaTot-(oldSigmaTot-degree[i]))/(2*m*m)
 				if delta > bestDelta {
@@ -150,7 +169,6 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 			}
 
 			if bestComm != oldComm {
-				// Update sigmaTot incrementally.
 				sigmaTot[oldComm] -= degree[i]
 				sigmaTot[bestComm] += degree[i]
 				comm[i] = bestComm
@@ -176,7 +194,10 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		commMembers[comm[i]] = append(commMembers[comm[i]], i)
 	}
 
-	subWeights := make(map[int]float64)
+	// Slice-based subWeights: refined[nb.node] ∈ [0, n) since refined[i] = i initially.
+	subWeights := make([]float64, n)
+	dirty := make([]int, 0, 64)
+
 	for _, members := range commMembers {
 		if len(members) <= 1 {
 			continue
@@ -184,21 +205,27 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		perm := rng.Perm(len(members))
 		for _, pi := range perm {
 			i := members[pi]
-			for k := range subWeights {
-				delete(subWeights, k)
+			for _, d := range dirty {
+				subWeights[d] = 0
 			}
+			dirty = dirty[:0]
+
 			for _, nb := range adj[i] {
 				if comm[nb.node] == comm[i] {
-					subWeights[refined[nb.node]] += nb.weight
+					r := refined[nb.node]
+					if subWeights[r] == 0 {
+						dirty = append(dirty, r)
+					}
+					subWeights[r] += nb.weight
 				}
 			}
 
 			bestRef := refined[i]
 			bestW := 0.0
-			for ref, w := range subWeights {
-				if ref != refined[i] && w > bestW {
-					bestW = w
-					bestRef = ref
+			for _, r := range dirty {
+				if r != refined[i] && subWeights[r] > bestW {
+					bestW = subWeights[r]
+					bestRef = r
 				}
 			}
 			if bestW > 0 {

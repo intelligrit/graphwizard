@@ -3,8 +3,10 @@
 package matching
 
 import (
+	"context"
 	"math"
 
+	"github.com/intelligrit/graphwizard/progress"
 	"gonum.org/v1/gonum/graph"
 )
 
@@ -24,7 +26,7 @@ type Matching map[int64]int64
 //
 // Reference: J. Hopcroft and R. Karp, "An n^(5/2) Algorithm for Maximum
 // Matchings in Bipartite Graphs", SIAM Journal on Computing, 1973.
-func HopcroftKarp(g graph.Undirected, left []int64) (Matching, int) {
+func HopcroftKarp(ctx context.Context, g graph.Undirected, left []int64) (Matching, int) {
 	leftSet := make(map[int64]bool, len(left))
 	for _, id := range left {
 		leftSet[id] = true
@@ -48,8 +50,11 @@ func HopcroftKarp(g graph.Undirected, left []int64) (Matching, int) {
 
 	dist := make(map[int64]int)
 	size := 0
+	phase := 0
 
 	for bfs(g, left, matchL, matchR, dist) {
+		progress.Report(ctx, progress.Progress{Phase: "phase", Step: phase, Total: -1})
+		phase++
 		for _, u := range left {
 			if matchL[u] == -1 {
 				if dfs(g, u, leftSet, matchL, matchR, dist) {

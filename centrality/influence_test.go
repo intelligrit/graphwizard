@@ -3,6 +3,7 @@
 package centrality
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestInfluenceMaximization_Star(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	seeds, influence := InfluenceMaximization(g, 1, 0.5, 100, rng)
+	seeds, influence := InfluenceMaximization(context.Background(), g, 1, 0.5, 100, rng)
 
 	if len(seeds) != 1 {
 		t.Fatalf("expected 1 seed, got %d", len(seeds))
@@ -41,7 +42,7 @@ func TestInfluenceMaximization_MultipleSeeds(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewSource(42))
-	seeds, _ := InfluenceMaximization(g, 2, 0.5, 100, rng)
+	seeds, _ := InfluenceMaximization(context.Background(), g, 2, 0.5, 100, rng)
 
 	if len(seeds) != 2 {
 		t.Fatalf("expected 2 seeds, got %d", len(seeds))
@@ -51,7 +52,7 @@ func TestInfluenceMaximization_MultipleSeeds(t *testing.T) {
 func TestInfluenceMaximization_Empty(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	rng := rand.New(rand.NewSource(42))
-	seeds, _ := InfluenceMaximization(g, 1, 0.5, 100, rng)
+	seeds, _ := InfluenceMaximization(context.Background(), g, 1, 0.5, 100, rng)
 	if seeds != nil {
 		t.Errorf("expected nil seeds for empty graph")
 	}
@@ -62,7 +63,7 @@ func TestInfluenceMaximization_KZero(t *testing.T) {
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
 
 	rng := rand.New(rand.NewSource(42))
-	seeds, _ := InfluenceMaximization(g, 0, 0.5, 100, rng)
+	seeds, _ := InfluenceMaximization(context.Background(), g, 0, 0.5, 100, rng)
 	if seeds != nil {
 		t.Errorf("expected nil seeds for k=0")
 	}
