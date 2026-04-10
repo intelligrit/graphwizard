@@ -148,15 +148,23 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 			// Per-goroutine slice buffers avoid map allocation and map iteration
 			// order non-determinism. Tie-breaking now follows adjacency list order,
 			// which is deterministic after aggregate() sorts its edge keys.
+			//
+			// localRefined is a flat slice (indexed by node ID in [0,n)) that
+			// replaces the per-community map. Using a slice eliminates Go's
+			// per-process map hash randomization from the hot path entirely.
+			// Stale entries from prior communities are never read: communities
+			// are disjoint, so a community only accesses its own members' slots.
 			subWeights := make([]float64, n)
 			dirty := make([]int, 0, 64)
+			localRefined := make([]int, n)
 			for cw := range ch {
-				localRNG := rand.New(rand.NewSource(cw.seed))
-				perm := localRNG.Perm(len(cw.members))
-				localRefined := make(map[int]int)
+				// Initialise this community's slots. Prior communities' entries
+				// may linger in other slots but are never accessed (disjoint membership).
 				for _, i := range cw.members {
 					localRefined[i] = i
 				}
+				localRNG := rand.New(rand.NewSource(cw.seed))
+				perm := localRNG.Perm(len(cw.members))
 				for _, pi := range perm {
 					i := cw.members[pi]
 					for _, d := range dirty {
@@ -184,9 +192,11 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 						localRefined[i] = bestRef
 					}
 				}
+				// Write back using the member list (sorted ascending) rather than
+				// map iteration, so the write order is deterministic across runs.
 				mu.Lock()
-				for i, ref := range localRefined {
-					refined[i] = ref
+				for _, i := range cw.members {
+					refined[i] = localRefined[i]
 				}
 				mu.Unlock()
 			}

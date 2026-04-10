@@ -418,6 +418,10 @@ func buildWeightedAdjFromDense(g graph.Undirected, da graphwizard.DenseAdjacency
 			degree[i] += w
 			totalWeight += w
 		}
+		// Sort by node index for deterministic tie-breaking. DenseNeighbors
+		// is documented to return dense indices, but custom implementations
+		// are not required to return them sorted.
+		sort.Slice(adj[i], func(a, b int) bool { return adj[i][a].node < adj[i][b].node })
 	}
 	totalWeight /= 2
 	return origIDs, adj, degree, totalWeight

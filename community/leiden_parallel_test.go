@@ -12,6 +12,34 @@ import (
 	"gonum.org/v1/gonum/graph/simple"
 )
 
+// samePartition returns true when a and b induce the same equivalence classes
+// on node IDs, ignoring community label numbering. This is the correct
+// comparison for determinism: the algorithm is allowed to assign different
+// integer labels to the same community across runs, as long as the SET of
+// nodes in each community is identical.
+func samePartition(a, b map[int64]int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	// Build canonical form: for each community, its representative is the
+	// smallest node ID in the community. Two maps are the same partition iff
+	// they produce identical canonical maps.
+	canon := func(m map[int64]int64) map[int64]int64 {
+		rep := make(map[int64]int64, len(m))
+		for nid, cid := range m {
+			if r, ok := rep[cid]; !ok || nid < r {
+				rep[cid] = nid
+			}
+		}
+		out := make(map[int64]int64, len(m))
+		for nid, cid := range m {
+			out[nid] = rep[cid]
+		}
+		return out
+	}
+	return maps.Equal(canon(a), canon(b))
+}
+
 func TestLeidenParallel_TwoCliques(t *testing.T) {
 	g := simple.NewUndirectedGraph()
 	// Two 4-cliques connected by a single edge.
@@ -145,5 +173,150 @@ func TestLeidenParallelGOMAXPROCS(t *testing.T) {
 				procs, diff, len(reference))
 		}
 	}
+}
+
+// TestLeidenParallelLargeScaleDeterministic is a scaled-up regression test for
+// non-determinism in mega-communities. It uses a mixed SBM with 5 large blocks
+// (200 nodes each) and 40 small blocks (20 nodes each) = 1,800 nodes total.
+// The large blocks produce communities of 100-200+ nodes, which stress the
+// parallel refinement path in ways that the smaller 1,000-node SBM test does
+// not. Running with GOMAXPROCS=4 exercises concurrent goroutine scheduling.
+func TestLeidenParallelLargeScaleDeterministic(t *testing.T) {
+	g := buildMixedSBMGraph(t)
+
+	old := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(old)
+
+	const runs = 20
+	var first map[int64]int64
+	for i := 0; i < runs; i++ {
+		rng := rand.New(rand.NewSource(42))
+		got := LeidenParallel(context.Background(), g, 1.0, rng)
+		if i == 0 {
+			first = got
+			continue
+		}
+		if !samePartition(got, first) {
+			// Also report by maps.Equal to distinguish label drift from true splits.
+			if maps.Equal(got, first) {
+				t.Fatalf("run %d: community labels differ (same partition, different IDs)", i)
+			}
+			diff := 0
+			for k, v := range got {
+				if first[k] != v {
+					diff++
+				}
+			}
+			t.Fatalf("run %d: partition differs from run 0 (%d/%d nodes in different communities)",
+				i, diff, len(got))
+		}
+	}
+}
+
+// TestLeidenParallelLargeScaleGOMAXPROCS verifies GOMAXPROCS-independence on
+// the larger mixed-SBM graph. This is the targeted regression for the
+// mega-community non-determinism reported against the Medicare bipartite graph.
+func TestLeidenParallelLargeScaleGOMAXPROCS(t *testing.T) {
+	g := buildMixedSBMGraph(t)
+
+	old := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(old)
+
+	rng0 := rand.New(rand.NewSource(42))
+	reference := LeidenParallel(context.Background(), g, 1.0, rng0)
+
+	for _, procs := range []int{2, 4, 8} {
+		runtime.GOMAXPROCS(procs)
+		rng := rand.New(rand.NewSource(42))
+		got := LeidenParallel(context.Background(), g, 1.0, rng)
+		if !samePartition(got, reference) {
+			diff := 0
+			for k, v := range got {
+				if reference[k] != v {
+					diff++
+				}
+			}
+			t.Errorf("GOMAXPROCS=%d: partition differs from GOMAXPROCS=1 (%d/%d nodes changed community)",
+				procs, diff, len(reference))
+		}
+	}
+}
+
+// TestLeidenParallelLargeScaleMatchesSerial verifies that the parallel and
+// serial implementations agree on the larger mixed-SBM graph.
+func TestLeidenParallelLargeScaleMatchesSerial(t *testing.T) {
+	g := buildMixedSBMGraph(t)
+
+	old := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(old)
+
+	rng1 := rand.New(rand.NewSource(42))
+	serial := Leiden(context.Background(), g, 1.0, rng1)
+
+	rng2 := rand.New(rand.NewSource(42))
+	parallel := LeidenParallel(context.Background(), g, 1.0, rng2)
+
+	if !samePartition(serial, parallel) {
+		diff := 0
+		for k, v := range parallel {
+			if serial[k] != v {
+				diff++
+			}
+		}
+		t.Fatalf("serial and parallel partitions differ: %d/%d nodes in different communities",
+			diff, len(serial))
+	}
+}
+
+// buildMixedSBMGraph builds a stochastic block model with mixed block sizes:
+// 5 large blocks of 200 nodes and 40 small blocks of 20 nodes = 1,800 total.
+// The large blocks produce communities large enough to stress the parallel
+// refinement code paths that the 1,000-node uniform SBM does not exercise.
+func buildMixedSBMGraph(t *testing.T) *simple.UndirectedGraph {
+	t.Helper()
+	rng := rand.New(rand.NewSource(7))
+	g := simple.NewUndirectedGraph()
+
+	// Build block structure: 5 blocks of 200 + 40 blocks of 20.
+	type block struct{ start, size int }
+	var blocks []block
+	nodeID := 0
+	for i := 0; i < 5; i++ {
+		blocks = append(blocks, block{nodeID, 200})
+		nodeID += 200
+	}
+	for i := 0; i < 40; i++ {
+		blocks = append(blocks, block{nodeID, 20})
+		nodeID += 20
+	}
+	for i := 0; i < nodeID; i++ {
+		g.AddNode(simple.Node(i))
+	}
+
+	const pIntra = 0.10
+	const pInter = 0.005
+
+	for bi, b := range blocks {
+		// Intra-block edges.
+		for u := b.start; u < b.start+b.size; u++ {
+			for v := u + 1; v < b.start+b.size; v++ {
+				if rng.Float64() < pIntra {
+					g.SetEdge(g.NewEdge(simple.Node(u), simple.Node(v)))
+				}
+			}
+		}
+		// Inter-block edges (only to later blocks to avoid duplicates).
+		for bj := bi + 1; bj < len(blocks); bj++ {
+			c := blocks[bj]
+			for u := b.start; u < b.start+b.size; u++ {
+				for v := c.start; v < c.start+c.size; v++ {
+					if rng.Float64() < pInter {
+						g.SetEdge(g.NewEdge(simple.Node(u), simple.Node(v)))
+					}
+				}
+			}
+		}
+	}
+	return g
 }
 
