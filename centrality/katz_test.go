@@ -73,6 +73,41 @@ func TestKatzUndirected_Triangle(t *testing.T) {
 	}
 }
 
+func TestKatzSparse_MatchesKatz(t *testing.T) {
+	// KatzSparse must produce the same result as Katz.
+	g := simple.NewDirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(3)))
+
+	dense := Katz(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+	sparse := KatzSparse(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+
+	for id, v := range dense {
+		if math.Abs(v-sparse[id]) > epsilon {
+			t.Errorf("node %d: Katz=%f KatzSparse=%f", id, v, sparse[id])
+		}
+	}
+}
+
+func TestKatzUndirectedSparse_MatchesKatzUndirected(t *testing.T) {
+	// KatzUndirectedSparse must produce the same result as KatzUndirected.
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(0)))
+	g.SetEdge(g.NewEdge(simple.Node(2), simple.Node(3)))
+
+	dense := KatzUndirected(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+	sparse := KatzUndirectedSparse(context.Background(), g, 0.1, 1.0, 1e-10, 200)
+
+	for id, v := range dense {
+		if math.Abs(v-sparse[id]) > epsilon {
+			t.Errorf("node %d: KatzUndirected=%f KatzUndirectedSparse=%f", id, v, sparse[id])
+		}
+	}
+}
+
 // Regression test: a graph that satisfies DenseAdjacency but returns nil
 // from NodeIDs() (unpreloaded diskgraph) must fall back to the generic
 // path and produce correct non-zero results.

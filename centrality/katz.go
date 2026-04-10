@@ -60,13 +60,10 @@ func Katz(ctx context.Context, g graph.Directed, alpha, beta, tol float64, maxIt
 
 	// Power iteration: x_new[i] = alpha * sum(x_old[j] for j in predecessors(i)) + beta
 	x := make([]float64, n)
-	for i := range x {
-		x[i] = 0
-	}
+	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
 		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
-		xNew := make([]float64, n)
 		for i := 0; i < n; i++ {
 			sum := 0.0
 			for _, j := range preds[i] {
@@ -80,7 +77,7 @@ func Katz(ctx context.Context, g graph.Directed, alpha, beta, tol float64, maxIt
 		for i := 0; i < n; i++ {
 			diff += math.Abs(xNew[i] - x[i])
 		}
-		x = xNew
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}
@@ -133,10 +130,10 @@ func KatzUndirected(ctx context.Context, g graph.Undirected, alpha, beta, tol fl
 	}
 
 	x := make([]float64, n)
+	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
 		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
-		xNew := make([]float64, n)
 		for i := 0; i < n; i++ {
 			sum := 0.0
 			for _, j := range adj[i] {
@@ -149,7 +146,7 @@ func KatzUndirected(ctx context.Context, g graph.Undirected, alpha, beta, tol fl
 		for i := 0; i < n; i++ {
 			diff += math.Abs(xNew[i] - x[i])
 		}
-		x = xNew
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}

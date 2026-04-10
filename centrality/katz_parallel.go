@@ -50,10 +50,10 @@ func KatzParallel(ctx context.Context, g graph.Directed, alpha, beta, tol float6
 
 	workers := runtime.GOMAXPROCS(0)
 	x := make([]float64, n)
+	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
 		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
-		xNew := make([]float64, n)
 
 		var wg sync.WaitGroup
 		chunkSize := (n + workers - 1) / workers
@@ -80,7 +80,7 @@ func KatzParallel(ctx context.Context, g graph.Directed, alpha, beta, tol float6
 		for i := 0; i < n; i++ {
 			diff += math.Abs(xNew[i] - x[i])
 		}
-		x = xNew
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}
@@ -134,10 +134,10 @@ func KatzUndirectedParallel(ctx context.Context, g graph.Undirected, alpha, beta
 
 	workers := runtime.GOMAXPROCS(0)
 	x := make([]float64, n)
+	xNew := make([]float64, n)
 
 	for iter := 0; iter < maxIter; iter++ {
 		progress.Report(ctx, progress.Progress{Phase: "iterate", Step: iter, Total: maxIter})
-		xNew := make([]float64, n)
 
 		var wg sync.WaitGroup
 		chunkSize := (n + workers - 1) / workers
@@ -164,7 +164,7 @@ func KatzUndirectedParallel(ctx context.Context, g graph.Undirected, alpha, beta
 		for i := 0; i < n; i++ {
 			diff += math.Abs(xNew[i] - x[i])
 		}
-		x = xNew
+		x, xNew = xNew, x
 		if diff < tol {
 			break
 		}
