@@ -6,6 +6,7 @@ import (
 	"context"
 	"math/rand"
 	"runtime"
+	"sort"
 	"sync"
 
 	"github.com/intelligrit/graphwizard/progress"
@@ -102,14 +103,22 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 		commMembers[comm[i]] = append(commMembers[comm[i]], i)
 	}
 
-	// Create deterministic per-community seeds from the main RNG.
+	// Sort community IDs so per-community seeds are consumed in a deterministic
+	// order regardless of Go map iteration randomization.
+	cids := make([]int, 0, len(commMembers))
+	for cid := range commMembers {
+		cids = append(cids, cid)
+	}
+	sort.Ints(cids)
+
 	type commWork struct {
 		commID  int
 		members []int
 		seed    int64
 	}
 	var work []commWork
-	for cid, members := range commMembers {
+	for _, cid := range cids {
+		members := commMembers[cid]
 		if len(members) <= 1 {
 			continue
 		}
@@ -136,6 +145,11 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			// Per-goroutine slice buffers avoid map allocation and map iteration
+			// order non-determinism. Tie-breaking now follows adjacency list order,
+			// which is deterministic after aggregate() sorts its edge keys.
+			subWeights := make([]float64, n)
+			dirty := make([]int, 0, 64)
 			for cw := range ch {
 				localRNG := rand.New(rand.NewSource(cw.seed))
 				perm := localRNG.Perm(len(cw.members))
@@ -143,24 +157,27 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 				for _, i := range cw.members {
 					localRefined[i] = i
 				}
-				subWeights := make(map[int]float64)
 				for _, pi := range perm {
 					i := cw.members[pi]
-					for k := range subWeights {
-						delete(subWeights, k)
+					for _, d := range dirty {
+						subWeights[d] = 0
 					}
+					dirty = dirty[:0]
 					for _, nb := range adj[i] {
 						if comm[nb.node] == comm[i] {
-							subWeights[localRefined[nb.node]] += nb.weight
+							r := localRefined[nb.node]
+							if subWeights[r] == 0 {
+								dirty = append(dirty, r)
+							}
+							subWeights[r] += nb.weight
 						}
 					}
-
 					bestRef := localRefined[i]
 					bestW := 0.0
-					for ref, w := range subWeights {
-						if ref != localRefined[i] && w > bestW {
-							bestW = w
-							bestRef = ref
+					for _, r := range dirty {
+						if r != localRefined[i] && subWeights[r] > bestW {
+							bestW = subWeights[r]
+							bestRef = r
 						}
 					}
 					if bestW > 0 {

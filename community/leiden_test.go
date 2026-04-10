@@ -4,6 +4,7 @@ package community
 
 import (
 	"context"
+	"maps"
 	"math/rand"
 	"testing"
 
@@ -81,4 +82,63 @@ func TestLeiden_EmptyGraph(t *testing.T) {
 	if len(comms) != 0 {
 		t.Errorf("expected empty result for empty graph, got %v", comms)
 	}
+}
+
+// TestLeidenDeterministic verifies that Leiden produces the same partition
+// across 20 runs with the same seed. Regression test for non-determinism
+// caused by Go map iteration order leaking into refine's rng.Perm call order.
+func TestLeidenDeterministic(t *testing.T) {
+	g := buildSBMGraph(t)
+
+	const runs = 20
+	var first map[int64]int64
+	for i := 0; i < runs; i++ {
+		rng := rand.New(rand.NewSource(42))
+		got := Leiden(context.Background(), g, 1.0, rng)
+		if i == 0 {
+			first = got
+			continue
+		}
+		if !maps.Equal(got, first) {
+			diff := 0
+			for k, v := range got {
+				if first[k] != v {
+					diff++
+				}
+			}
+			t.Fatalf("run %d: partition differs from run 0 (%d/%d nodes changed community)",
+				i, diff, len(got))
+		}
+	}
+}
+
+// buildSBMGraph builds a stochastic block model graph: 10 blocks of 100 nodes,
+// intra-block edge probability 0.10, inter-block 0.01. At 1000 nodes the graph
+// is large enough that Go's map iteration randomization reliably fires across
+// runs, making it a reliable regression target for determinism bugs.
+func buildSBMGraph(t *testing.T) *simple.UndirectedGraph {
+	t.Helper()
+	const (
+		blocks   = 10
+		perBlock = 100
+		pIntra   = 0.10
+		pInter   = 0.01
+	)
+	rng := rand.New(rand.NewSource(1))
+	g := simple.NewUndirectedGraph()
+	for i := 0; i < blocks*perBlock; i++ {
+		g.AddNode(simple.Node(i))
+	}
+	for i := 0; i < blocks*perBlock; i++ {
+		for j := i + 1; j < blocks*perBlock; j++ {
+			p := pInter
+			if i/perBlock == j/perBlock {
+				p = pIntra
+			}
+			if rng.Float64() < p {
+				g.SetEdge(g.NewEdge(simple.Node(i), simple.Node(j)))
+			}
+		}
+	}
+	return g
 }

@@ -5,6 +5,7 @@ package community
 import (
 	"context"
 	"math/rand"
+	"sort"
 
 	"github.com/intelligrit/graphwizard"
 	"github.com/intelligrit/graphwizard/progress"
@@ -194,15 +195,27 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		commMembers[comm[i]] = append(commMembers[comm[i]], i)
 	}
 
+	// Sort community IDs so RNG is consumed in a deterministic order across runs.
+	cids := make([]int, 0, len(commMembers))
+	for cid := range commMembers {
+		cids = append(cids, cid)
+	}
+	sort.Ints(cids)
+
 	// Slice-based subWeights: refined[nb.node] ∈ [0, n) since refined[i] = i initially.
 	subWeights := make([]float64, n)
 	dirty := make([]int, 0, 64)
 
-	for _, members := range commMembers {
+	for _, cid := range cids {
+		members := commMembers[cid]
 		if len(members) <= 1 {
 			continue
 		}
-		perm := rng.Perm(len(members))
+		// Seed a per-community RNG from the main RNG. This mirrors refineParallel's
+		// approach so that Leiden and LeidenParallel consume the top-level RNG
+		// identically and produce the same partition for a given seed.
+		localRNG := rand.New(rand.NewSource(rng.Int63()))
+		perm := localRNG.Perm(len(members))
 		for _, pi := range perm {
 			i := members[pi]
 			for _, d := range dirty {
@@ -302,9 +315,22 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 		}
 	}
 
+	// Sort edge keys so adjacency list order is deterministic across runs.
+	// Non-deterministic order here would propagate through localMove tie-breaking
+	// in all subsequent iterations.
+	keys := make([]edgeKey, 0, len(edgeWeights))
+	for k := range edgeWeights {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].from != keys[j].from {
+			return keys[i].from < keys[j].from
+		}
+		return keys[i].to < keys[j].to
+	})
 	newAdj := make([][]neighbor, newN)
-	for key, w := range edgeWeights {
-		newAdj[key.from] = append(newAdj[key.from], neighbor{node: key.to, weight: w})
+	for _, k := range keys {
+		newAdj[k.from] = append(newAdj[k.from], neighbor{node: k.to, weight: edgeWeights[k]})
 	}
 
 	return newComm, newAdj, newDegree, newSelfLoops, newN, aggMap
@@ -331,6 +357,9 @@ func buildWeightedAdjFromScan(g graph.Undirected, es graphwizard.EdgeScanner) ([
 	for nodes.Next() {
 		origIDs = append(origIDs, nodes.Node().ID())
 	}
+	// Sort node IDs for a deterministic index mapping (g.Nodes() iterates a map).
+	sort.Slice(origIDs, func(i, j int) bool { return origIDs[i] < origIDs[j] })
+
 	n := len(origIDs)
 	if n == 0 {
 		return nil, nil, nil, 0
@@ -355,6 +384,10 @@ func buildWeightedAdjFromScan(g graph.Undirected, es graphwizard.EdgeScanner) ([
 		degree[i] += w
 		totalWeight += w
 	})
+	// Sort each adjacency list by node index for deterministic tie-breaking.
+	for i := range adj {
+		sort.Slice(adj[i], func(a, b int) bool { return adj[i][a].node < adj[i][b].node })
+	}
 	totalWeight /= 2
 	return origIDs, adj, degree, totalWeight
 }
@@ -396,6 +429,10 @@ func buildWeightedAdjFromIter(g graph.Undirected) ([]int64, [][]neighbor, []floa
 	for nodes.Next() {
 		origIDs = append(origIDs, nodes.Node().ID())
 	}
+	// Sort node IDs for a deterministic index mapping regardless of g.Nodes() order.
+	// g.Nodes() and g.From() iterate internal Go maps whose order varies per run.
+	sort.Slice(origIDs, func(i, j int) bool { return origIDs[i] < origIDs[j] })
+
 	n := len(origIDs)
 	if n == 0 {
 		return nil, nil, nil, 0
@@ -427,6 +464,9 @@ func buildWeightedAdjFromIter(g graph.Undirected) ([]int64, [][]neighbor, []floa
 			degree[i] += w
 			totalWeight += w
 		}
+		// Sort neighbors by node index for deterministic adjacency list ordering.
+		// Non-deterministic order here leaks into localMove and refine tie-breaking.
+		sort.Slice(adj[i], func(a, b int) bool { return adj[i][a].node < adj[i][b].node })
 	}
 	totalWeight /= 2
 	return origIDs, adj, degree, totalWeight
