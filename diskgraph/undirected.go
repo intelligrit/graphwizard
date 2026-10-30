@@ -4,7 +4,11 @@ package diskgraph
 
 import (
 	"database/sql"
+	"iter"
 	"math"
+
+	"github.com/intelligrit/graphwizard"
+	"github.com/intelligrit/graphwizard/internal/compact"
 
 	"gonum.org/v1/gonum/graph"
 )
@@ -18,10 +22,8 @@ import (
 // for additional speed on algorithms that call HasEdgeBetween in tight
 // loops (e.g., ClusteringCoefficient).
 //
-// When preloaded, adjacency is stored in CSR (Compressed Sparse Row)
-// format: two flat arrays totalling 8*E + 4*(N+1) bytes. For an 81M-edge
-// graph this is ~1.3 GB instead of the ~20 GB+ that map-based storage
-// would require.
+// When preloaded, adjacency stores dense indexes and machine-sized CSR offsets.
+// Packed24Preload and CompressedPreload optionally encode indexes losslessly.
 type Undirected struct {
 	db *sql.DB
 
@@ -35,7 +37,8 @@ type Undirected struct {
 	nodeIDs []int64
 
 	// adj, when non-nil, holds preloaded adjacency in CSR format.
-	adj *csr
+	adj              *csr
+	neighborEncoding compact.NeighborEncoding
 }
 
 // OpenUndirected opens a SQLite file previously created by UndirectedBuilder.
@@ -52,7 +55,7 @@ func OpenUndirected(path string, opts ...Option) (*Undirected, error) {
 		return nil, err
 	}
 
-	g := &Undirected{db: db}
+	g := &Undirected{db: db, neighborEncoding: cfg.neighbors}
 
 	// Prepare hot-path statements.
 	g.stmtFrom, err = db.Prepare("SELECT dst FROM edges WHERE src = ?")
@@ -117,7 +120,7 @@ func (g *Undirected) preloadAdj() {
 			yield(src, dst)
 		}
 	}
-	g.adj = buildCSR(g.nodeIDs, edgeIter)
+	g.adj = buildCSR(g.nodeIDs, edgeIter, g.neighborEncoding)
 
 	// CSR now handles all adjacency queries; disable mmap to reclaim
 	// the virtual address space. Weight queries still hit SQLite but
@@ -168,11 +171,11 @@ func (g *Undirected) Nodes() graph.Nodes {
 // From returns all nodes reachable from the node with the given ID.
 func (g *Undirected) From(id int64) graph.Nodes {
 	if g.adj != nil {
-		neighbors := g.adj.neighbors(id)
-		if neighbors == nil {
+		i := searchID(g.nodeIDs, id)
+		if i < 0 {
 			return emptyNodes{}
 		}
-		return newSliceNodes(neighbors)
+		return compact.NewNodes(g.nodeIDs, g.adj.adj.Cursor(i))
 	}
 	rows, err := g.stmtFrom.Query(id)
 	if err != nil {
@@ -262,6 +265,42 @@ func (g *Undirected) DenseNeighbors(i int) []int32 {
 	return g.adj.denseNeighbors(i)
 }
 
+// Neighbors traverses preloaded dense neighbor indices without row allocations.
+// It yields nothing if adjacency has not been preloaded.
+func (g *Undirected) Neighbors(i int) iter.Seq[int32] {
+	return func(yield func(int32) bool) {
+		if g.adj == nil {
+			return
+		}
+		c := g.adj.adj.Cursor(i)
+		for c.Next() {
+			if !yield(c.Value()) {
+				return
+			}
+		}
+	}
+}
+
+// NewNeighborCursor creates an independent reusable decoder for preloaded
+// adjacency. An unpreloaded graph returns an empty cursor.
+func (g *Undirected) NewNeighborCursor() graphwizard.NeighborCursor {
+	if g.adj == nil {
+		return &compact.Cursor{}
+	}
+	c := g.adj.adj.Cursor(-1)
+	return &c
+}
+
+// AdjacencyBytes reports retained preloaded adjacency and node ID slice payloads.
+// It excludes SQLite caches, mapped pages, and object headers.
+func (g *Undirected) AdjacencyBytes() int64 {
+	size := int64(cap(g.nodeIDs)) * 8
+	if g.adj != nil {
+		size += g.adj.adj.StorageBytes()
+	}
+	return size
+}
+
 // NumNodes returns the number of nodes.
 func (g *Undirected) NumNodes() int {
 	return len(g.nodeIDs)
@@ -287,6 +326,7 @@ func (g *Undirected) ScanWeightedEdges(yield func(src, dst int64, weight float64
 
 // Compile-time interface checks.
 var (
-	_ graph.Undirected         = (*Undirected)(nil)
-	_ graph.WeightedUndirected = (*Undirected)(nil)
+	_ graph.Undirected                  = (*Undirected)(nil)
+	_ graph.WeightedUndirected          = (*Undirected)(nil)
+	_ graphwizard.DenseNeighborIterator = (*Undirected)(nil)
 )

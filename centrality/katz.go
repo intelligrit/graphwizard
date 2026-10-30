@@ -168,6 +168,7 @@ func katzUndirectedDense(ctx context.Context, da graphwizard.DenseAdjacency, alp
 		return make(map[int64]float64)
 	}
 
+	cursor := newDenseNeighborCursor(da)
 	x := make([]float64, n)
 	xNew := make([]float64, n)
 
@@ -178,8 +179,15 @@ func katzUndirectedDense(ctx context.Context, da graphwizard.DenseAdjacency, alp
 		}
 		for i := 0; i < n; i++ {
 			sum := 0.0
-			for _, j := range da.DenseNeighbors(i) {
-				sum += x[j]
+			if cursor != nil {
+				cursor.Reset(i)
+				for cursor.Next() {
+					sum += x[cursor.Neighbor()]
+				}
+			} else {
+				for _, j := range da.DenseNeighbors(i) {
+					sum += x[j]
+				}
 			}
 			xNew[i] = alpha*sum + beta
 		}
@@ -199,4 +207,12 @@ func katzUndirectedDense(ctx context.Context, da graphwizard.DenseAdjacency, alp
 		result[id] = x[i]
 	}
 	return result
+}
+
+// Reusable decoders avoid both row copies and per-row iterator closures.
+func newDenseNeighborCursor(da graphwizard.DenseAdjacency) graphwizard.NeighborCursor {
+	if it, ok := da.(graphwizard.DenseNeighborIterator); ok {
+		return it.NewNeighborCursor()
+	}
+	return nil
 }

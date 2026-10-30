@@ -27,23 +27,19 @@ g, _ := diskgraph.OpenUndirected("graph.db")
 defer g.Close()
 ```
 
-**Memory behavior:** By default, adjacency data is read directly from
-bolt's memory-mapped file with zero Go heap allocation. For algorithms
-that call `HasEdgeBetween` in tight loops (e.g., ClusteringCoefficient),
-pass `Preload` to cache adjacency in Go memory:
+**Memory behavior:** By default, adjacency is read using SQLite queries.
+Pass `Preload` to keep dense-indexed adjacency in Go memory. Edge weights
+remain in SQLite:
 
 ```go
 g, _ := diskgraph.OpenUndirected("graph.db", diskgraph.Preload)
 ```
 
-Preload costs roughly `E * 40` bytes:
-
-| Edges | Preload Memory |
-|---|---|
-| 1M | ~40 MB |
-| 10M | ~400 MB |
-| 83M | ~3.3 GB |
-| 500M | ~20 GB |
+Flat preloaded adjacency costs `4*D + sizeof(int)*(N+1) + 8*N` bytes,
+where `D` is the number of directed edge entries and `N` the number of
+nodes. An undirected edge normally contributes two entries. On a 64-bit
+system, 5.8M nodes and 82.6M undirected edges need approximately **0.75 GB**
+of slice payloads, excluding SQLite caches and algorithm working memory.
 
 If the estimated cost exceeds 70% of available RAM, a warning is logged
 and preloading is skipped. Use `ForcePreload` to override.
@@ -51,6 +47,159 @@ and preloading is skipped. Use `ForcePreload` to override.
 **When to use `simple.UndirectedGraph` instead:** Only when you need a
 mutable graph (adding/removing edges after construction) or for
 ephemeral throwaway graphs in tests.
+
+## Memory and compression
+
+For immutable in-memory analysis, `densegraph` stores the same dense neighbor
+indexes and keeps weights inline. Its flat slice payload is:
+
+```
+4*D + sizeof(int)*(N+1) + 8*N + weightBytes
+```
+
+Exact weight storage is selected automatically after duplicate edges are
+resolved:
+
+| Weight values | Additional bytes per directed entry |
+|---|---:|
+| All identical, including unit weights | 0 (one graph-wide constant) |
+| Nonnegative integers up to 255 | 1 |
+| Nonnegative integers up to 65,535 | 2 |
+| Nonnegative integers up to 4,294,967,295 | 4 |
+| Other values | 8 (`float64`) |
+
+Float64 fallback preserves negative values, fractions, signed zero, infinities,
+and NaN payloads. Constant storage also preserves the original bit pattern.
+These encodings preserve every edge and weight; they do not approximate the
+graph.
+
+Two independent options can reduce storage further:
+
+```go
+g := builder.Build(densegraph.PackNeighbors24, densegraph.BlockWeights)
+```
+
+`PackNeighbors24` uses three bytes per dense neighbor index, replacing `4*D`
+with `3*D` in the storage formula. This saves exactly 25% of the neighbor array,
+not 25% of the entire graph. All indexes must fit in 24 bits (maximum
+16,777,215); otherwise the graph keeps flat int32 indexes. This always fits
+graphs with at most 16,777,216 nodes. Original int64 IDs do not affect packing.
+For 82.6M undirected edges, packing saves about 165.2 MB of neighbor payload.
+Binary search reads each packed index directly, without decoding preceding
+neighbors. Scans still pay for unpacking three bytes. Use
+`diskgraph.Packed24Preload` for the same option on undirected SQLite adjacency.
+
+`BlockWeights` selects a constant, uint8, uint16, uint32, or float64 separately
+for each consecutive block of 128 directed entries. A fractional outlier thus
+widens only its block. Blocks cross node boundaries and store one machine-sized
+byte offset plus a one-byte kind (9 bytes per block on a 64-bit system).
+Constant blocks store one float64; other blocks use 1, 2, 4, or 8 bytes per entry.
+Selection includes all this metadata and keeps the graph-wide encoding unless
+blocks save payload. Unit-weight graphs remain a single implicit constant.
+Weight lookup is still O(1), but reads block metadata and decodes bytes.
+Construction makes extra passes over weights to size and select the encoding
+before allocating the final arrays. Scattered outliers in every block may give
+no saving. This option affects densegraph only; diskgraph weights stay in SQLite.
+
+Both options are off by default. `BlockWeights` combines with either neighbor
+encoding; when `PackNeighbors24` and `CompressNeighbors` are both supplied, the
+last wins. The analogous diskgraph encoding options also use the last selection;
+`Preload` and `ForcePreload` do not reset it.
+
+These independent implementations draw on Besta et al.,
+[Log(Graph): A Near-Optimal High-Performance Graph Representation](https://arxiv.org/abs/2010.15879)
+(PACT 2018; arXiv version 2020), Sections 3.2–3.3, for sizing vertex IDs and
+integer weights to their value ranges; and Shun, Dhulipala, and Blelloch,
+[Smaller and Faster: Parallel Processing of Compressed Graphs with Ligra+](https://www.cs.cmu.edu/~blelloch/papers/SDB15.pdf)
+(DCC 2015), Section 3, for selecting widths for groups of entries. Our 24-bit
+width, fixed 128-entry weight blocks, constant representation, and exact float64
+fallback are local design choices. The papers' measurements are not performance
+claims for GraphWizard; the measurements below come from our own benchmarks.
+
+Use `builder.Build(densegraph.CompressNeighbors)` or
+`diskgraph.OpenUndirected(path, diskgraph.CompressedPreload)` to request
+lossless block delta encoding. Each block of 32 dense indexes stores an
+absolute starting value followed by signed delta varints. Restart positions
+bound lookup decoding. Blocks may cross node boundaries to avoid per-node
+compression metadata. The encoder keeps flat storage when compression would
+increase the payload. Gap encoding and lazy traversal are discussed in Boldi
+and Vigna, [The WebGraph Framework I: Compression Techniques](https://vigna.di.unimi.it/ftp/papers/WebGraphI.pdf)
+(WWW 2004). Our 32-entry restarts and signed varints are local choices; this
+independent implementation does not reproduce WebGraph's reference or interval
+compression schemes.
+
+Delta compression depends on neighbor gaps and ordering. It increases decoding
+CPU cost, especially for random edge lookups. The default remains flat storage
+and graph-wide exact weights.
+`From`, `Neighbors`, and weighted neighbor traversal decode without retaining
+a second adjacency copy. `DenseNeighbors` remains compatible, but allocates a
+fresh row when packed or compressed. Concurrent readers have independent decoder state;
+there is no mutable shared decompression cache.
+
+Leiden and parallel Leiden share the original weighted adjacency through
+`DenseWeightedAdjacency`. They still allocate node state, aggregate edge maps,
+and coarsened adjacency. Disk graphs keep weights in SQLite and use a single
+edge scan to construct the algorithm's weighted adjacency, avoiding per-edge
+SQL lookups. Katz variants use reusable neighbor cursors rather than repeatedly
+materializing compressed rows. Each worker has independent decoder state.
+Parallel refinement shares its node labels and weight scratch across workers:
+each community accesses only its own nodes and refined labels. On a 64-bit
+system, these two arrays use `16 × V` bytes total instead of
+`8 × V + 16 × V × workers`. Membership lists, permutations, cursors, and other
+algorithm state are additional. Serial and parallel refinement reuse RNG state
+with the same per-community seeds, preserving permutations and results.
+Lower scratch allocation does not guarantee faster refinement: worker
+scheduling and cache locality still affect throughput. Measure the whole
+analysis as well as allocation volume.
+
+Measure retained arrays with `densegraph.Undirected.StorageBytes()` or
+`diskgraph.Undirected.AdjacencyBytes()`. These exclude headers, allocator
+rounding, database caches, and algorithm state. For densegraph, the builder
+also retains a 16-byte entry per directed edge until construction finishes
+(32 bytes per ordinary undirected edge, before final arrays). It maps original
+IDs to temporary `int32` indexes during ingestion, then remaps those indexes
+once into sorted node-ID order. CSR construction uses the dense endpoints
+directly, avoiding per-edge binary searches and a separate degree array.
+The ID map, node IDs, remapping table, spare builder capacity, and final arrays
+also need memory. Compact temporary edges help most on edge-heavy graphs;
+the index map and remapping table add per-node overhead during construction.
+Use `NewUndirectedBuilderSized` when counts are available to
+avoid growing and copying the edge buffer; its edge hint counts directed entries.
+Neighbor packing or compression temporarily overlaps flat and encoded arrays.
+Construction still buffers the graph; lower retained memory does not imply
+the same reduction in peak construction memory.
+
+Reproduce storage, traversal, construction, and algorithm allocation benchmarks:
+
+```sh
+go test ./internal/compact ./densegraph ./community -run '^$' \
+  -bench 'BenchmarkNeighbors|BenchmarkCompactGraph|BenchmarkWeightedAdjacencyBuild|BenchmarkSharedLeiden|BenchmarkRefinementScratch' \
+  -benchmem
+```
+
+The storage metrics describe the benchmark fixtures, not a guaranteed reduction
+for a production graph. Existing `BenchmarkGraphMemory` benchmarks keep the
+graph alive across GC so retained heap measurements include its storage.
+`BenchmarkCompactGraph` compares all six neighbor/weight combinations on small
+integer weights; `BenchmarkCompactGraphOutlier` adds one fractional edge to
+show when block weights help. Both report retained payload, traversal time,
+and construction allocations.
+
+For the 10,000-node outlier fixture (319,728 directed entries), the retained
+slice payloads measured on a 64-bit system are:
+
+| Optional settings | Retained bytes |
+|---|---:|
+| None | 3,996,744 |
+| `PackNeighbors24` | 3,677,016 |
+| `BlockWeights` | 1,782,026 |
+| Both | 1,462,298 |
+
+Both options save about 63% for this fixture, which deliberately has mostly
+small integer weights. Uniformly small integer weights already use one byte
+each, so the block option falls back without a storage saving. Time benchmarks
+should be run on representative graph sizes and degree/weight distributions;
+these payload reductions do not predict traversal speed or peak RSS.
 
 ## Choosing the Right Algorithm Variant
 
@@ -220,8 +369,9 @@ fmt.Printf("New edges: %d, Removed: %d\n",
 
 3. **Pre-build neighbor sets** if you're calling multiple similarity
    functions on the same graph. The parallel variants do this
-   internally. With diskgraph, adjacency is auto-preloaded so this
-   is already handled.
+   internally. Diskgraph can preload compact sorted adjacency with
+   `Preload` or `CompressedPreload`; similarity algorithms may still build
+   additional working sets.
 
 4. **Use `runtime.GOMAXPROCS`** to control parallelism. The parallel
    variants auto-detect available cores but you can tune this for
@@ -234,11 +384,11 @@ fmt.Printf("New edges: %d, Removed: %d\n",
 6. **For DuckDB**, use `?access_mode=READ_ONLY` when loading to
    allow concurrent readers.
 
-7. **Memory estimation**: `diskgraph` with preloading uses ~40 bytes
-   per edge for adjacency data. The bolt file on disk uses ~50 bytes
-   per edge. A 5.8M node / 82.6M edge graph needs ~3.3 GB for preload
-   plus the bolt file. Without preloading (`NoPreload`), the graph uses
-   only the OS page cache — no Go heap allocation.
+7. **Memory estimation**: use `StorageBytes` / `AdjacencyBytes` for retained
+   array payloads and profile the whole process for peak memory. Preload
+   stores dense int32 neighbors; its cost depends on both node count and
+   directed edge count. Without preloading, SQL queries and database caches
+   still use memory. See [Memory and compression](#memory-and-compression).
 
 ## Algorithm Complexity Reference
 

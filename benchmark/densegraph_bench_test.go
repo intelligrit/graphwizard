@@ -139,7 +139,8 @@ func BenchmarkGraphMemory_Memory_10K(b *testing.B) {
 		g := BarabasiAlbert(10000, 3, rng)
 		runtime.GC()
 		runtime.ReadMemStats(&after)
-		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc), "graph-bytes")
+		runtime.KeepAlive(g)
+		b.ReportMetric(float64(int64(after.HeapAlloc)-int64(before.HeapAlloc)), "graph-bytes")
 		_ = g
 	}
 }
@@ -155,7 +156,8 @@ func BenchmarkGraphMemory_Dense_10K(b *testing.B) {
 		g := DenseBarabasiAlbert(10000, 3, rng)
 		runtime.GC()
 		runtime.ReadMemStats(&after)
-		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc), "graph-bytes")
+		runtime.KeepAlive(g)
+		b.ReportMetric(float64(int64(after.HeapAlloc)-int64(before.HeapAlloc)), "graph-bytes")
 		_ = g
 	}
 }
@@ -171,7 +173,8 @@ func BenchmarkGraphMemory_Memory_50K(b *testing.B) {
 		g := BarabasiAlbert(50000, 3, rng)
 		runtime.GC()
 		runtime.ReadMemStats(&after)
-		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc), "graph-bytes")
+		runtime.KeepAlive(g)
+		b.ReportMetric(float64(int64(after.HeapAlloc)-int64(before.HeapAlloc)), "graph-bytes")
 		_ = g
 	}
 }
@@ -187,7 +190,8 @@ func BenchmarkGraphMemory_Dense_50K(b *testing.B) {
 		g := DenseBarabasiAlbert(50000, 3, rng)
 		runtime.GC()
 		runtime.ReadMemStats(&after)
-		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc), "graph-bytes")
+		runtime.KeepAlive(g)
+		b.ReportMetric(float64(int64(after.HeapAlloc)-int64(before.HeapAlloc)), "graph-bytes")
 		_ = g
 	}
 }

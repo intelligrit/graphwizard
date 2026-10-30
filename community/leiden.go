@@ -17,6 +17,48 @@ type neighbor struct {
 	weight float64
 }
 
+// weightedAdj borrows immutable graph storage at the original level and owns
+// only coarsened adjacency. Neighbor order is deterministic in both cases.
+type weightedAdj struct {
+	rows   [][]neighbor
+	shared graphwizard.DenseWeightedAdjacency
+}
+
+type weightedAdjCursor struct {
+	rows   [][]neighbor
+	row    []neighbor
+	pos    int
+	shared graphwizard.WeightedNeighborCursor
+}
+
+func (a weightedAdj) cursor() weightedAdjCursor {
+	if a.shared != nil {
+		return weightedAdjCursor{shared: a.shared.NewWeightedCursor()}
+	}
+	return weightedAdjCursor{rows: a.rows}
+}
+func (c *weightedAdjCursor) reset(i int) {
+	if c.shared != nil {
+		c.shared.Reset(i)
+		return
+	}
+	c.row, c.pos = c.rows[i], -1
+}
+func (c *weightedAdjCursor) next() bool {
+	if c.shared != nil {
+		return c.shared.Next()
+	}
+	c.pos++
+	return c.pos < len(c.row)
+}
+func (c *weightedAdjCursor) value() (int, float64) {
+	if c.shared != nil {
+		return int(c.shared.Neighbor()), c.shared.Weight()
+	}
+	nb := c.row[c.pos]
+	return nb.node, nb.weight
+}
+
 // Leiden performs community detection using the Leiden algorithm, returning a
 // map from node ID to community ID.
 //
@@ -104,7 +146,8 @@ func Leiden(ctx context.Context, g graph.Undirected, resolution float64, rng *ra
 // (the prior value of 10 caused 3+ hour runtimes on 3M-node bipartite graphs).
 const defaultMaxLocalSweeps = 3
 
-func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int, totalWeight, resolution float64, maxSweeps int, rng *rand.Rand) bool {
+func localMove(adj weightedAdj, degree, selfLoops []float64, comm []int, n int, totalWeight, resolution float64, maxSweeps int, rng *rand.Rand) bool {
+	cursor := adj.cursor()
 	moved := false
 	order := make([]int, n)
 	for i := range order {
@@ -136,12 +179,14 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 			}
 			dirty = dirty[:0]
 
-			for _, nb := range adj[i] {
-				c := comm[nb.node]
+			cursor.reset(i)
+			for cursor.next() {
+				j, w := cursor.value()
+				c := comm[j]
 				if commWeights[c] == 0 {
 					dirty = append(dirty, c)
 				}
-				commWeights[c] += nb.weight
+				commWeights[c] += w
 			}
 
 			oldComm := comm[i]
@@ -184,7 +229,8 @@ func localMove(adj [][]neighbor, degree, selfLoops []float64, comm []int, n int,
 	return moved
 }
 
-func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Rand) []int {
+func refine(adj weightedAdj, degree []float64, comm []int, n int, rng *rand.Rand) []int {
+	cursor := adj.cursor()
 	refined := make([]int, n)
 	for i := range refined {
 		refined[i] = i
@@ -202,9 +248,10 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 	}
 	sort.Ints(cids)
 
-	// Slice-based subWeights: refined[nb.node] ∈ [0, n) since refined[i] = i initially.
+	// Slice-based subWeights: refined[j] ∈ [0, n) since refined[i] = i initially.
 	subWeights := make([]float64, n)
 	dirty := make([]int, 0, 64)
+	localRNG := rand.New(rand.NewSource(1))
 
 	for _, cid := range cids {
 		members := commMembers[cid]
@@ -214,7 +261,9 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 		// Seed a per-community RNG from the main RNG. This mirrors refineParallel's
 		// approach so that Leiden and LeidenParallel consume the top-level RNG
 		// identically and produce the same partition for a given seed.
-		localRNG := rand.New(rand.NewSource(rng.Int63()))
+		// Reseeding preserves the permutation without allocating a new source
+		// for every community.
+		localRNG.Seed(rng.Int63())
 		perm := localRNG.Perm(len(members))
 		for _, pi := range perm {
 			i := members[pi]
@@ -223,13 +272,15 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 			}
 			dirty = dirty[:0]
 
-			for _, nb := range adj[i] {
-				if comm[nb.node] == comm[i] {
-					r := refined[nb.node]
+			cursor.reset(i)
+			for cursor.next() {
+				j, w := cursor.value()
+				if comm[j] == comm[i] {
+					r := refined[j]
 					if subWeights[r] == 0 {
 						dirty = append(dirty, r)
 					}
-					subWeights[r] += nb.weight
+					subWeights[r] += w
 				}
 			}
 
@@ -253,7 +304,8 @@ func refine(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Ran
 // edgeKey identifies a directed community→community edge for aggregation.
 type edgeKey struct{ from, to int }
 
-func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n int, remap map[int]int, edgeWeights map[edgeKey]float64) ([]int, [][]neighbor, []float64, []float64, int, []int) {
+func aggregate(refined []int, adj weightedAdj, degree, selfLoops []float64, n int, remap map[int]int, edgeWeights map[edgeKey]float64) ([]int, weightedAdj, []float64, []float64, int, []int) {
+	cursor := adj.cursor()
 	// Clear reusable buffers.
 	for k := range remap {
 		delete(remap, k)
@@ -288,10 +340,12 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 	for i := 0; i < n; i++ {
 		ci := remap[refined[i]]
 		newSelfLoops[ci] += selfLoops[i]
-		for _, nb := range adj[i] {
-			cj := remap[refined[nb.node]]
+		cursor.reset(i)
+		for cursor.next() {
+			j, w := cursor.value()
+			cj := remap[refined[j]]
 			if ci == cj {
-				newSelfLoops[ci] += nb.weight // counted once per direction
+				newSelfLoops[ci] += w // counted once per direction
 			}
 		}
 	}
@@ -306,11 +360,13 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 	}
 	for i := 0; i < n; i++ {
 		ci := remap[refined[i]]
-		for _, nb := range adj[i] {
-			cj := remap[refined[nb.node]]
+		cursor.reset(i)
+		for cursor.next() {
+			j, w := cursor.value()
+			cj := remap[refined[j]]
 			if ci != cj {
 				key := edgeKey{ci, cj}
-				edgeWeights[key] += nb.weight
+				edgeWeights[key] += w
 			}
 		}
 	}
@@ -333,22 +389,39 @@ func aggregate(refined []int, adj [][]neighbor, degree, selfLoops []float64, n i
 		newAdj[k.from] = append(newAdj[k.from], neighbor{node: k.to, weight: edgeWeights[k]})
 	}
 
-	return newComm, newAdj, newDegree, newSelfLoops, newN, aggMap
+	return newComm, weightedAdj{rows: newAdj}, newDegree, newSelfLoops, newN, aggMap
 }
 
 // buildWeightedAdj constructs dense-indexed weighted adjacency lists.
 // It picks the fastest available path:
-//  1. DenseAdjacency (preloaded CSR) — zero SQL, shares memory.
-//  2. EdgeScanner (unpreloaded diskgraph) — one sequential table scan.
-//  3. Fallback iter — per-node From()+Weight() queries.
-func buildWeightedAdj(g graph.Undirected) (origIDs []int64, adj [][]neighbor, degree []float64, totalWeight float64) {
-	if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
-		return buildWeightedAdjFromDense(g, da)
+//  1. DenseWeightedAdjacency — borrows graph storage without an edge copy.
+//  2. EdgeScanner — one sequential table scan, including weights.
+//  3. DenseAdjacency or generic gonum iteration — materializes weighted rows.
+func buildWeightedAdj(g graph.Undirected) (origIDs []int64, adj weightedAdj, degree []float64, totalWeight float64) {
+	if shared, ok := g.(graphwizard.DenseWeightedAdjacency); ok && shared.NodeIDs() != nil {
+		origIDs = shared.NodeIDs()
+		degree = make([]float64, shared.NumNodes())
+		cursor := shared.NewWeightedCursor()
+		for i := range degree {
+			cursor.Reset(i)
+			for cursor.Next() {
+				w := cursor.Weight()
+				degree[i] += w
+				totalWeight += w
+			}
+		}
+		return origIDs, weightedAdj{shared: shared}, degree, totalWeight / 2
 	}
+	var rows [][]neighbor
+	// A sequential scan avoids per-edge weight SQL queries for disk-backed graphs.
 	if es, ok := g.(graphwizard.EdgeScanner); ok {
-		return buildWeightedAdjFromScan(g, es)
+		origIDs, rows, degree, totalWeight = buildWeightedAdjFromScan(g, es)
+	} else if da, ok := g.(graphwizard.DenseAdjacency); ok && da.NodeIDs() != nil {
+		origIDs, rows, degree, totalWeight = buildWeightedAdjFromDense(g, da)
+	} else {
+		origIDs, rows, degree, totalWeight = buildWeightedAdjFromIter(g)
 	}
-	return buildWeightedAdjFromIter(g)
+	return origIDs, weightedAdj{rows: rows}, degree, totalWeight
 }
 
 func buildWeightedAdjFromScan(g graph.Undirected, es graphwizard.EdgeScanner) ([]int64, [][]neighbor, []float64, float64) {
@@ -380,13 +453,21 @@ func buildWeightedAdjFromScan(g graph.Undirected, es graphwizard.EdgeScanner) ([
 		if !ok1 || !ok2 {
 			return
 		}
+		// Match graph.Weight's self-edge convention on every input path.
+		if i == j {
+			w = 0
+		}
 		adj[i] = append(adj[i], neighbor{node: j, weight: w})
-		degree[i] += w
-		totalWeight += w
 	})
 	// Sort each adjacency list by node index for deterministic tie-breaking.
 	for i := range adj {
 		sort.Slice(adj[i], func(a, b int) bool { return adj[i][a].node < adj[i][b].node })
+		// Accumulate in the same sorted order as the shared adjacency path,
+		// independently of the scan order (floating-point sums are ordered).
+		for _, nb := range adj[i] {
+			degree[i] += nb.weight
+			totalWeight += nb.weight
+		}
 	}
 	totalWeight /= 2
 	return origIDs, adj, degree, totalWeight
@@ -475,4 +556,3 @@ func buildWeightedAdjFromIter(g graph.Undirected) ([]int64, [][]neighbor, []floa
 	totalWeight /= 2
 	return origIDs, adj, degree, totalWeight
 }
-

@@ -1,8 +1,8 @@
 // Copyright (c) 2026 Intelligrit. MIT License. See LICENSE.
 
-// Package diskgraph provides disk-backed graph implementations using bbolt
+// Package diskgraph provides disk-backed graph implementations using SQLite
 // that satisfy gonum/graph interfaces. Graphs are persisted to a single file,
-// memory-mapped for reads, and can exceed available RAM.
+// queried through prepared statements, and can exceed available RAM.
 //
 // diskgraph is the recommended graph storage for GraphWizard. Benchmarks show
 // it is faster than gonum's in-memory simple.UndirectedGraph for the majority
@@ -38,7 +38,7 @@
 //
 // For algorithms that call HasEdgeBetween in tight loops (e.g.,
 // ClusteringCoefficient), pass Preload to cache adjacency data in
-// Go memory for O(1) lookups:
+// Go memory for binary-search edge lookups:
 //
 //	g, _ := diskgraph.OpenUndirected("graph.db", diskgraph.Preload)
 //
@@ -47,7 +47,12 @@
 //	g, _ := diskgraph.OpenUndirected("graph.db")
 //	g.PreloadAdjacency()
 //
-// Preload costs roughly E * 40 bytes (83M edges ~ 3.3 GB). If the
+// Preload stores one int32 per directed edge entry, machine-sized CSR
+// offsets, and an int64 node-ID table. Packed24Preload optionally uses three
+// bytes per index when all indexes fit; CompressedPreload selects exact block
+// delta encoding instead. Weights remain in SQLite. If the
 // estimated cost exceeds 70% of available RAM, a warning is logged and
-// preloading is skipped. Use ForcePreload to override.
+// preloading is skipped. Use ForcePreload to override. Packing or compression temporarily
+// overlaps flat and encoded arrays during construction; AdjacencyBytes reports
+// retained slice payloads, not peak process memory.
 package diskgraph

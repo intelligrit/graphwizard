@@ -25,7 +25,7 @@ interfaces. Cleanroom implementations from academic papers, plus unified
 wrappers around gonum's built-in algorithms — one import per domain,
 no iterator gymnastics required.
 
-**New:** The `diskgraph` package provides a bbolt-backed graph that is
+**New:** The `diskgraph` package provides a SQLite-backed graph that is
 **faster than in-memory gonum graphs** for most algorithms while also
 supporting persistence and out-of-core processing. See
 [Recommended: diskgraph](#recommended-diskgraph) below.
@@ -48,7 +48,7 @@ in-process on gonum graph structures loaded from DuckDB.
 We looked at the Go ecosystem and found gonum covers the basics well, but
 there's no comprehensive library that fills the gaps: no Leiden, no Katz, no
 bipartite matching, no bridge detection, no MST, no embeddings. So we built
-one — including `diskgraph`, a bbolt-backed graph store that turned out to be
+one — including `diskgraph`, a SQLite-backed graph store that turned out to be
 faster than gonum's in-memory graphs for most algorithms, while also handling
 our 82.6M edge dataset without requiring everything in RAM.
 
@@ -66,7 +66,7 @@ go get github.com/intelligrit/graphwizard
 
 | Package | Algorithms | Source |
 |---|---|---|
-| **diskgraph** | Disk-backed Undirected/Directed graphs with auto-preloading, bbolt storage | Custom |
+| **diskgraph** | Disk-backed Undirected/Directed graphs with optional preloading, SQLite storage | Custom |
 | **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
 | **community** | Leiden, Louvain, Label Propagation, Spectral Clustering | Custom + gonum |
 | **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy, Topological Sort | Custom + gonum |
@@ -104,7 +104,7 @@ func main() {
     })
     b.Close()
 
-    // Open the graph — adjacency is auto-preloaded for speed.
+    // Open the graph — add diskgraph.Preload to cache adjacency in memory.
     g, _ := diskgraph.OpenUndirected("example.db")
     defer g.Close()
 
@@ -125,7 +125,7 @@ func main() {
 ## Recommended: diskgraph
 
 We recommend `diskgraph` as the default graph storage for all GraphWizard
-workloads. It replaces `gonum/graph/simple` with a bbolt-backed
+workloads. It replaces `gonum/graph/simple` with a SQLite-backed
 implementation that is:
 
 - **Faster** — benchmarks show diskgraph matches or beats in-memory
@@ -133,17 +133,15 @@ implementation that is:
   PreferentialAttachment run 4x faster; most run 10-30% faster.
 
 - **Persistent** — build the graph once, reopen it instantly across
-  program runs. No serialization, no import step. The bolt file is the
+  program runs. No serialization, no import step. The SQLite file is the
   database.
 
-- **Scalable** — graphs too large for RAM work automatically. Pass
-  `NoPreload` and the graph reads directly from disk via memory-mapped
-  I/O.
+- **Scalable** — adjacency stays on disk by default, with node IDs retained
+  in memory. Enable preloading when the adjacency fits in RAM.
 
 - **Tunable** — pass `Preload` to cache adjacency data in Go memory
-  for O(1) `HasEdgeBetween` on algorithms like ClusteringCoefficient.
-  Without it, reads go through bolt's memory-mapped file with zero
-  heap allocation.
+  for in-memory neighbor traversal and binary-search edge lookups.
+  Without it, prepared SQLite queries read adjacency and weights.
 
 ```go
 // Build once (use Batch for best write performance).
@@ -170,6 +168,70 @@ bridges := connectivity.Bridges(g)
 a mutable graph (adding/removing edges after construction) or when
 building ephemeral throwaway graphs in tests. For all analytical
 workloads, use `diskgraph`.
+
+## Compact memory storage
+
+`densegraph` keeps one dense `int32` neighbor index per directed edge entry,
+with original node IDs stored once per node. Weights are stored exactly using
+a single constant, `uint8`, `uint16`, `uint32`, or `float64`, depending on the
+values. Constant weights (including ordinary unweighted graphs) need no
+per-edge weight array. No precision is discarded.
+
+```go
+b := densegraph.NewUndirectedBuilder()
+b.AddWeightedEdge(100, 200, 7)
+b.AddWeightedEdge(200, 300, 12)
+// Both options are independent and off by default. Build() keeps flat int32
+// neighbors and chooses one exact weight representation for the whole graph.
+g := b.Build(densegraph.PackNeighbors24, densegraph.BlockWeights)
+```
+
+| Optional setting | Effect |
+|---|---|
+| `densegraph.PackNeighbors24` | Three bytes per neighbor index, saving 25% of the neighbor array. Falls back to int32 if any index exceeds 16,777,215. Original int64 IDs are preserved. |
+| `densegraph.CompressNeighbors` | Alternative block delta encoding, retained only if its payload is smaller than flat indexes. Usually more decoding work than 24-bit packing. |
+| `densegraph.BlockWeights` | Selects an exact representation per 128 directed entries, so an outlier need not widen every weight. Retained only if data plus metadata beat the graph-wide representation. |
+
+Call `Build` only once per builder. `BlockWeights` combines with either neighbor
+option. If both neighbor options are supplied, the last wins. All modes are
+lossless, including fractional weights, signed zero, and NaN bit patterns.
+Packed neighbors and block weights add decoding work; benchmark with your
+graph before selecting them for CPU-sensitive workloads.
+`From` and `Neighbors` decode lazily. The compatibility method `DenseNeighbors`
+returns a fresh decoded row in packed or delta mode and does not cache it.
+
+For SQLite-backed undirected graphs, neighbor packing is available during
+adjacency preloading. Weights stay in SQLite:
+
+```go
+g, err := diskgraph.OpenUndirected("graph.db", diskgraph.Packed24Preload)
+```
+
+Use `diskgraph.CompressedPreload` for delta encoding, or `diskgraph.Preload`
+for flat indexes. The last encoding option wins; `Preload` and `ForcePreload`
+do not change a selected encoding.
+
+`g.StorageBytes()` on a dense graph and `g.AdjacencyBytes()` on a disk graph
+report retained slice payloads. These exclude object headers, database caches,
+allocator overhead, and algorithm working memory. Building or compressing a
+graph temporarily needs additional memory; retained size is not peak RSS.
+The dense builder uses 16-byte temporary directed entries, assigning compact
+indexes during ingestion and remapping them once into sorted node-ID order.
+This preserves original IDs and last-weight-wins duplicate handling while
+avoiding per-edge ID searches during construction.
+
+Leiden and parallel Leiden borrow weighted adjacency from graphs implementing
+`graphwizard.DenseWeightedAdjacency`, including all densegraph storage modes.
+They allocate their own coarsened graphs, without copying the original weighted
+edge array. Katz variants use streaming neighbors for compressed storage.
+Parallel Leiden refinement shares node scratch arrays across workers, with
+each community owning disjoint slots; these arrays no longer scale with worker
+count. Serial and parallel refinement reuse random generators while preserving
+the seeded results.
+Generic gonum graphs remain supported through the existing fallback paths.
+
+See [BEST_PRACTICES.md](BEST_PRACTICES.md#memory-and-compression) for storage
+formulas, tradeoffs, and reproducible memory benchmarks.
 
 ## Best Practices
 
@@ -201,8 +263,11 @@ a complexity reference table for every algorithm.
 
 ## Academic References
 
-| Algorithm | Paper |
+| Algorithm / representation | Paper |
 |---|---|
+| Packed neighbor IDs and integer weight widths | Besta et al. ["Log(Graph): A Near-Optimal High-Performance Graph Representation."](https://arxiv.org/abs/2010.15879) *PACT*, 2018; Sections 3.2–3.3. |
+| Grouped weight encoding | Shun, Dhulipala, Blelloch. ["Smaller and Faster: Parallel Processing of Compressed Graphs with Ligra+."](https://www.cs.cmu.edu/~blelloch/papers/SDB15.pdf) *DCC*, 2015; Section 3. |
+| Neighbor gap encoding and lazy traversal | Boldi, Vigna. ["The WebGraph Framework I: Compression Techniques."](https://vigna.di.unimi.it/ftp/papers/WebGraphI.pdf) *WWW*, 2004. |
 | Leiden | Traag, Waltman, van Eck. "From Louvain to Leiden." *Scientific Reports*, 2019 |
 | Label Propagation | Raghavan, Albert, Kumara. "Near linear time algorithm to detect community structures." *Physical Review E*, 2007 |
 | Katz Centrality | Katz. "A New Status Index Derived from Sociometric Analysis." *Psychometrika*, 1953 |
@@ -226,13 +291,19 @@ a complexity reference table for every algorithm.
 | Spectral Clustering | Ng, Jordan, Weiss. "On Spectral Clustering." *NIPS*, 2001 |
 | Min Cut | Ford, Fulkerson. "Maximal Flow Through a Network." *Canadian J. Math*, 1956 |
 
+The storage papers inform specific techniques. GraphWizard's 24-bit width,
+128-entry weight blocks, exact float64 fallback, and 32-entry delta restarts
+are independent design choices. Our storage and timing measurements come from
+GraphWizard benchmarks; the papers' benchmark results do not describe this
+implementation. See [memory and compression](BEST_PRACTICES.md#memory-and-compression).
+
 ## Stats
 
 - 50+ source files, 50+ test files
 - 7,500+ lines of Go
 - 220+ test and example functions
 - 97%+ statement coverage (5 packages at 100%)
-- Dependencies: gonum (algorithms), bbolt (disk storage)
+- Dependencies: gonum (algorithms), SQLite (disk storage)
 
 ## License
 

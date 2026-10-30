@@ -184,7 +184,11 @@ func katzUndirectedParallelDense(ctx context.Context, da graphwizard.DenseAdjace
 		return make(map[int64]float64)
 	}
 
-	workers := runtime.GOMAXPROCS(0)
+	workers := min(runtime.GOMAXPROCS(0), n)
+	cursors := make([]graphwizard.NeighborCursor, workers)
+	for i := range cursors {
+		cursors[i] = newDenseNeighborCursor(da)
+	}
 	x := make([]float64, n)
 	xNew := make([]float64, n)
 
@@ -196,22 +200,29 @@ func katzUndirectedParallelDense(ctx context.Context, da graphwizard.DenseAdjace
 
 		var wg sync.WaitGroup
 		chunkSize := (n + workers - 1) / workers
-		for start := 0; start < n; start += chunkSize {
+		for worker, start := 0, 0; start < n; worker, start = worker+1, start+chunkSize {
 			end := start + chunkSize
 			if end > n {
 				end = n
 			}
 			wg.Add(1)
-			go func(lo, hi int) {
+			go func(lo, hi int, cursor graphwizard.NeighborCursor) {
 				defer wg.Done()
 				for i := lo; i < hi; i++ {
 					sum := 0.0
-					for _, j := range da.DenseNeighbors(i) {
-						sum += x[j]
+					if cursor != nil {
+						cursor.Reset(i)
+						for cursor.Next() {
+							sum += x[cursor.Neighbor()]
+						}
+					} else {
+						for _, j := range da.DenseNeighbors(i) {
+							sum += x[j]
+						}
 					}
 					xNew[i] = alpha*sum + beta
 				}
-			}(start, end)
+			}(start, end, cursors[worker])
 		}
 		wg.Wait()
 

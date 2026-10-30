@@ -90,9 +90,9 @@ func LeidenParallel(ctx context.Context, g graph.Undirected, resolution float64,
 	return result
 }
 
-// refineParallel runs the Leiden refinement phase with each community
-// processed in a separate goroutine.
-func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *rand.Rand) []int {
+// refineParallel runs the Leiden refinement phase with disjoint communities
+// distributed across a bounded pool of workers.
+func refineParallel(adj weightedAdj, degree []float64, comm []int, n int, rng *rand.Rand) []int {
 	refined := make([]int, n)
 	for i := range refined {
 		refined[i] = i
@@ -133,7 +133,12 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 		return refined
 	}
 
-	var mu sync.Mutex
+	// Each work item owns a disjoint set of nodes. Refined labels start at
+	// their node index and can only move to another member of that community.
+	// Checking comm[j] before reading refined[j] therefore confines every
+	// read/write of refined and subWeights to slots owned by one worker.
+	// Share these arrays instead of allocating two graph-sized arrays per worker.
+	subWeights := make([]float64, n)
 	ch := make(chan commWork, len(work))
 	for _, w := range work {
 		ch <- w
@@ -145,25 +150,13 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// Per-goroutine slice buffers avoid map allocation and map iteration
-			// order non-determinism. Tie-breaking now follows adjacency list order,
-			// which is deterministic after aggregate() sorts its edge keys.
-			//
-			// localRefined is a flat slice (indexed by node ID in [0,n)) that
-			// replaces the per-community map. Using a slice eliminates Go's
-			// per-process map hash randomization from the hot path entirely.
-			// Stale entries from prior communities are never read: communities
-			// are disjoint, so a community only accesses its own members' slots.
-			subWeights := make([]float64, n)
+			cursor := adj.cursor()
+			// The touched-slot list and RNG are worker-local. Clearing slots from
+			// the previous community is safe: each community is processed once.
 			dirty := make([]int, 0, 64)
-			localRefined := make([]int, n)
+			localRNG := rand.New(rand.NewSource(1))
 			for cw := range ch {
-				// Initialise this community's slots. Prior communities' entries
-				// may linger in other slots but are never accessed (disjoint membership).
-				for _, i := range cw.members {
-					localRefined[i] = i
-				}
-				localRNG := rand.New(rand.NewSource(cw.seed))
+				localRNG.Seed(cw.seed)
 				perm := localRNG.Perm(len(cw.members))
 				for _, pi := range perm {
 					i := cw.members[pi]
@@ -171,34 +164,29 @@ func refineParallel(adj [][]neighbor, degree []float64, comm []int, n int, rng *
 						subWeights[d] = 0
 					}
 					dirty = dirty[:0]
-					for _, nb := range adj[i] {
-						if comm[nb.node] == comm[i] {
-							r := localRefined[nb.node]
+					cursor.reset(i)
+					for cursor.next() {
+						j, w := cursor.value()
+						if comm[j] == comm[i] {
+							r := refined[j]
 							if subWeights[r] == 0 {
 								dirty = append(dirty, r)
 							}
-							subWeights[r] += nb.weight
+							subWeights[r] += w
 						}
 					}
-					bestRef := localRefined[i]
+					bestRef := refined[i]
 					bestW := 0.0
 					for _, r := range dirty {
-						if r != localRefined[i] && subWeights[r] > bestW {
+						if r != refined[i] && subWeights[r] > bestW {
 							bestW = subWeights[r]
 							bestRef = r
 						}
 					}
 					if bestW > 0 {
-						localRefined[i] = bestRef
+						refined[i] = bestRef
 					}
 				}
-				// Write back using the member list (sorted ascending) rather than
-				// map iteration, so the write order is deterministic across runs.
-				mu.Lock()
-				for _, i := range cw.members {
-					refined[i] = localRefined[i]
-				}
-				mu.Unlock()
 			}
 		}()
 	}
