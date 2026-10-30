@@ -67,6 +67,7 @@ go get github.com/intelligrit/graphwizard
 | Package | Algorithms | Source |
 |---|---|---|
 | **diskgraph** | Disk-backed Undirected/Directed graphs with optional preloading, SQLite storage | Custom |
+| **multigraph** | Distinct relationships by type/year, named weight columns, explicit projections into compact analytical graphs | Custom |
 | **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
 | **community** | Leiden, Louvain, Label Propagation, Spectral Clustering | Custom + gonum |
 | **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy, Topological Sort | Custom + gonum |
@@ -186,11 +187,12 @@ b.AddWeightedEdge(200, 300, 12)
 g := b.Build(densegraph.PackNeighbors24, densegraph.BlockWeights)
 ```
 
-| Optional setting | Effect |
-|---|---|
-| `densegraph.PackNeighbors24` | Three bytes per neighbor index, saving 25% of the neighbor array. Falls back to int32 if any index exceeds 16,777,215. Original int64 IDs are preserved. |
-| `densegraph.CompressNeighbors` | Alternative block delta encoding, retained only if its payload is smaller than flat indexes. Usually more decoding work than 24-bit packing. |
-| `densegraph.BlockWeights` | Selects an exact representation per 128 directed entries, so an outlier need not widen every weight. Retained only if data plus metadata beat the graph-wide representation. |
+| Setting | Benefit | Cost and when to use it |
+|---|---|---|
+| `Build()` (default) | Flat int32 neighbors and automatic exact graph-wide weight encoding. Constant weights need no per-edge array. | Start here when traversal speed and random lookups matter more than further memory savings. |
+| `densegraph.PackNeighbors24` | Saves 25% of the neighbor array, not the entire graph. Original int64 IDs are preserved. | Adds three-byte decoding to scans/lookups. A useful first option when memory is tight; falls back to int32 if any dense index exceeds 16,777,215. |
+| `densegraph.CompressNeighbors` | Delta-encodes neighbor indexes when gaps compress well; retained only if its payload beats flat indexes. | More decoding work, especially for random lookups. Try it when fitting the graph in memory matters more than traversal speed. |
+| `densegraph.BlockWeights` | Selects an exact representation per 128 entries, so a few large or fractional values need not widen every weight. | Extra encoding passes and metadata lookups. Helps mixed weight ranges; may save nothing for uniform widths or outliers in every block. |
 
 Call `Build` only once per builder. `BlockWeights` combines with either neighbor
 option. If both neighbor options are supplied, the last wins. All modes are
@@ -232,6 +234,70 @@ Generic gonum graphs remain supported through the existing fallback paths.
 
 See [BEST_PRACTICES.md](BEST_PRACTICES.md#memory-and-compression) for storage
 formulas, tradeoffs, and reproducible memory benchmarks.
+
+## Multiple weights and relationships
+
+Use `multigraph` when one relationship has several metrics, or the same nodes
+have separate relationships by year, type, or observation. Every added record
+gets its own ID; repeated endpoints never overwrite an earlier record.
+
+```go
+b := multigraph.NewBuilder()
+b.AddRelationship(1, 2, multigraph.Attributes{Type: "prescribed", Year: 2022},
+    map[string]float64{"claims": 10, "dollars": 100})
+b.AddRelationship(1, 2, multigraph.Attributes{Type: "prescribed", Year: 2023},
+    map[string]float64{"claims": 15, "dollars": 180})
+relationships := b.Build(multigraph.BlockWeights)
+
+// Select the meaning of the graph before running a weighted algorithm.
+g, err := relationships.ProjectUndirected(multigraph.Projection{
+    Weight: "claims",
+    Filter: func(r multigraph.Relationship) bool {
+        return r.Type == "prescribed" && r.Year == 2023
+    },
+}, densegraph.PackNeighbors24)
+if err != nil {
+    log.Fatal(err)
+}
+// g implements gonum graph.WeightedUndirected and the compact traversal APIs.
+```
+
+A projection rejects parallel relationships by default. Set `Combine` to
+`multigraph.Sum`, `Minimum`, or `Maximum` when combining selected records is
+intentional. Missing weights cause an error by default; `SkipMissing` and
+`ZeroMissing` are explicit alternatives. A stored zero remains an edge.
+
+The immutable store keeps named weights in exact compact columns, with presence
+bitmaps where needed. Maps supplied to `AddRelationship` are copied into columns,
+not retained per edge. Each projection materializes its own compact graph and
+needs temporary build memory. The store is in memory; existing single-weight
+builders and the diskgraph file schema are unchanged.
+
+`loader.LoadRelationships` and `loader.ScanRelationships` load SQL rows with
+type, year, and multiple numeric columns, preserving NULL weights as missing.
+Keep individual years in the input: an already aggregated graph cannot recover
+the original relationships. See [relationship projections](BEST_PRACTICES.md#multiple-weights-and-relationship-projections)
+for selection rules, memory costs, and SQL examples.
+
+One large local validation used 290.8 million year/type-preserving relationships,
+3.24 million nodes, and three weight columns. The claims-sum projection contained
+65.6 million pairs. These are retained numeric payloads, with one timed run per
+mode on an Apple M5 Max; they are workload-specific observations:
+
+| Mode | Store (GiB) | Claims graph (GiB) | Claims Leiden (s) |
+|---|---:|---:|---:|
+| Default | 7.67 | 1.03 | 16.7 |
+| Block weights + packed neighbors | 6.99 | 0.66 | 18.6 |
+| Block weights + delta neighbors | 6.99 | 0.48 | 21.1 |
+
+The optional modes enabled `multigraph.BlockWeights` on the store and
+`densegraph.BlockWeights` plus the named neighbor option on each projection.
+Store, projection, and algorithm results matched exactly across modes. Delta
+saved more graph memory but took about 26% longer for Leiden on this view.
+Loading still peaked near 43 GiB per process in all three modes; compression
+does not remove builder or database-driver memory costs. See
+[optional modes at scale](BEST_PRACTICES.md#optional-storage-modes-at-scale)
+for the measurement setup, other views, and repeated-pass guidance.
 
 ## Best Practices
 

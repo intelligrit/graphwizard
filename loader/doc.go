@@ -11,6 +11,11 @@
 //	db, _ := sql.Open("postgres", connStr)
 //	g, err := loader.LoadDirected(db, "SELECT from_id, to_id FROM edges")
 //	g, err := loader.LoadWeightedDirected(db, "SELECT from_id, to_id, weight FROM edges")
+//	s, err := loader.LoadRelationships(db, "SELECT from_id, to_id, kind, year, claims, dollars FROM relations", []string{"claims", "dollars"})
+//
+// LoadRelationships preserves repeated endpoints and named weights in a
+// multigraph.Store. Select type/year, weight, and reduction policy with
+// Store.ProjectUndirected before passing its graph to an algorithm.
 //
 // Writing:
 //

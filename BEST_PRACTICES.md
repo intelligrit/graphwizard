@@ -99,7 +99,8 @@ blocks save payload. Unit-weight graphs remain a single implicit constant.
 Weight lookup is still O(1), but reads block metadata and decodes bytes.
 Construction makes extra passes over weights to size and select the encoding
 before allocating the final arrays. Scattered outliers in every block may give
-no saving. This option affects densegraph only; diskgraph weights stay in SQLite.
+no saving. `multigraph.BlockWeights` applies the same encoding to relationship
+columns; diskgraph weights stay in SQLite.
 
 Both options are off by default. `BlockWeights` combines with either neighbor
 encoding; when `PackNeighbors24` and `CompressNeighbors` are both supplied, the
@@ -152,6 +153,23 @@ Lower scratch allocation does not guarantee faster refinement: worker
 scheduling and cache locality still affect throughput. Measure the whole
 analysis as well as allocation volume.
 
+Choose options according to the limiting resource:
+
+| Setting | Good fit | Cost or limitation |
+|---|---|---|
+| Default flat neighbors and graph-wide weights | A graph that fits comfortably in memory; frequent scans or random edge lookups. | Uses four bytes per neighbor even when smaller representations would fit. Exact narrow/constant weight encoding is already automatic. |
+| `PackNeighbors24` | Predictable neighbor savings with modest decoding work. | Saves 25% of neighbor payload only; dense indexes must fit in 24 bits. Each access unpacks three bytes. |
+| `CompressNeighbors` | Memory-constrained analyses with compressible neighbor gaps and predominantly sequential traversal. | Signed varints and restart decoding cost CPU. Random lookup decodes within restart blocks; some graphs fall back without saving payload. |
+| `BlockWeights` | Weight columns with locally small ranges, constant runs, or isolated outliers. | Adds metadata, encoding passes, and lookup work. Already narrow uniform weights or widely scattered outliers may yield no saving. |
+
+The savings check for delta neighbors and block weights protects retained
+payload size. It does not guarantee faster construction or traversal, or refund
+the work spent evaluating an encoding that falls back. Test options separately
+if you need to attribute a saving to neighbor encoding versus weight encoding.
+`multigraph.BlockWeights` configures the immutable store; options passed to
+`ProjectUndirected` independently configure each result. Neighbor encoding does
+not compress the store's 16-byte relationship metadata rows.
+
 Measure retained arrays with `densegraph.Undirected.StorageBytes()` or
 `diskgraph.Undirected.AdjacencyBytes()`. These exclude headers, allocator
 rounding, database caches, and algorithm state. For densegraph, the builder
@@ -200,6 +218,194 @@ small integer weights. Uniformly small integer weights already use one byte
 each, so the block option falls back without a storage saving. Time benchmarks
 should be run on representative graph sizes and degree/weight distributions;
 these payload reductions do not predict traversal speed or peak RSS.
+
+## Multiple weights and relationship projections
+
+`multigraph` is an opt-in in-memory relationship store for analyses that need
+separate observations and more than one metric. A record contains endpoint IDs,
+a type string, an int32 year, and any number of named float64 weights. Each call
+to `Builder.AddRelationship` creates a distinct record, including exact
+duplicates. Its returned ID is an insertion position within that store, not a
+cross-database identifier. `Store.Relationships` and `Store.Weight` expose the
+original records without reduction. Empty type and zero year denote untyped
+and undated records; there is no automatic date inference.
+
+Existing `densegraph` and `diskgraph` builders still store one scalar weight per
+endpoint pair and retain their existing duplicate handling. Choose the new
+store explicitly when repeated pairs must survive.
+
+For database input, return four metadata columns followed by the named weights:
+
+```go
+relationships, err := loader.LoadRelationships(db, `
+    SELECT provider_id, drug_id, 'prescribed', year, claims, dollars
+    FROM annual_relationships
+    ORDER BY provider_id, drug_id, year
+`, []string{"claims", "dollars"}, multigraph.BlockWeights)
+if err != nil {
+    return err
+}
+```
+
+Every SQL row survives. NULL weights remain missing, including in an entirely
+NULL column; NULL type/year become empty type/zero year. `DefineWeight` can
+register a metric with no supplied values when using the builder directly.
+Weights use float64 values supplied by the driver, so numeric conversion from
+other SQL types happens before storage. Include a unique tie-breaker in `ORDER BY`
+if duplicate rows need stable IDs and floating-point reduction order.
+To retain isolated nodes or preallocate capacity, create a `multigraph.Builder`,
+call `AddNode`, then pass SQL rows to `loader.ScanRelationships`. That function
+appends to the builder; discard it if an error requires all-or-nothing loading.
+Input queries must preserve the distinctions you need: grouping across years
+before loading cannot be undone by the graph library.
+
+Algorithms consume an explicit scalar-weight projection:
+
+```go
+g, err := relationships.ProjectUndirected(multigraph.Projection{
+    Weight: "claims",
+    Filter: func(r multigraph.Relationship) bool {
+        return r.Type == "prescribed" && r.Year >= 2020 && r.Year <= 2023
+    },
+    Combine: multigraph.Sum,
+}, densegraph.PackNeighbors24, densegraph.BlockWeights)
+```
+
+`ProjectUndirected` returns a `*densegraph.Undirected`, usable directly by gonum
+and GraphWizard algorithms. Filtering happens before missing-weight checks and
+combining. The projection groups both endpoint orientations together and keeps
+all registered nodes, including isolates. Self relationships are counted once;
+the resulting graph retains gonum's zero self-weight convention for `Weight`.
+
+| Choice | Behavior |
+|---|---|
+| `Combine: RejectParallel` (default) | Error if more than one selected, retained record connects a pair. |
+| `Combine: Sum` | Sum weights in insertion order; appropriate when the chosen metric is additive. |
+| `Combine: Minimum` / `Maximum` | Keep the smallest/largest selected value per pair. |
+| `Weight: ""` | One unit per relationship; together with `Sum`, counts relationships. |
+| `Missing: ErrorMissing` (default) | Error for a selected record without the requested weight. |
+| `Missing: SkipMissing` | Omit that record from the projection. |
+| `Missing: ZeroMissing` | Include that record with weight zero, keeping its edge. |
+
+An unknown metric name is always an error, even for an empty selection. The
+errors `ErrUnknownWeight`, `ErrMissingWeight`, and `ErrParallelRelationships`
+support `errors.Is`. A stored zero is never treated as absent. Combining values
+uses ordinary float64 arithmetic and is an intentional transformation; it does
+not promise lossless aggregation, avoid overflow, or infer compatible units.
+The original store remains exact and unchanged. Use a metric's meaning when
+choosing a reducer: an additive count and a shortest-path cost may need different
+rules. Weight-aware algorithms use the selected metric; topology-only algorithms
+such as the current Katz implementations ignore edge weights.
+
+Storage has one 16-byte metadata row per relationship, original node IDs stored
+once, and independently compressed weight columns. A partially populated column
+adds one presence bit per relationship, rounded to whole uint64 words. Complete
+columns need no bitmap, and constant columns need no per-record value array.
+There are no retained per-relationship maps or duplicated reverse records.
+`multigraph.BlockWeights` opts into exact block encoding for store columns;
+`densegraph.BlockWeights` on a projection separately configures that graph.
+
+`Store.StorageBytes` reports retained numeric array payload, excluding strings,
+dictionaries, and object headers. A materialized projection adds its own graph
+storage and temporary sorting/build buffers. Keeping several projected graphs
+simultaneously therefore adds memory. `NewBuilderSized` accepts a relationship
+count, with each observation counted once. Existing single-weight graphs incur
+none of this metadata overhead.
+
+The new store is immutable and supports concurrent readers and independent
+projections. It does not add persistence or change the existing diskgraph schema;
+retain the source relationships in your database when they must survive restart.
+
+```sh
+go test ./multigraph -run '^$' -bench BenchmarkRelationships -benchmem
+```
+
+### Optional storage modes at scale
+
+A full-scale local validation used 290,789,017 relationships, 3,243,863 nodes,
+and three named columns: claims, dollars, and a constant unit weight. Records
+preserved year and relationship type; source rows within an endpoint/type/year
+group were summed before loading. These are annual aggregates plus undated
+relationships, rather than individual transaction events. The source fixture
+and run artifacts are not distributed with the repository; the tables contain
+aggregate measurements only.
+
+Three configurations were tested in separate processes:
+
+| Mode | Store build options | Projection build options |
+|---|---|---|
+| Default | None | None |
+| Packed + blocks | `multigraph.BlockWeights` | `densegraph.PackNeighbors24`, `densegraph.BlockWeights` |
+| Delta + blocks | `multigraph.BlockWeights` | `densegraph.CompressNeighbors`, `densegraph.BlockWeights` |
+
+The count and dollar-sum graphs each had 81,545,079 undirected pairs. The
+claims-sum graph had 65,609,451 pairs. All projections retained the full node
+set, including isolates. Retained numeric payloads, in GiB (2^30 bytes), were:
+
+| Mode | Relationship store | Count graph | Claims graph | Dollar graph |
+|---|---:|---:|---:|---:|
+| Default | 7.675 | 0.808 | 1.026 | 1.871 |
+| Packed + blocks | 6.989 | 0.656 | 0.665 | 1.719 |
+| Delta + blocks | 6.989 | 0.445 | 0.484 | 1.509 |
+
+Store block weights saved about 9%. The combined projection options saved
+about 35% (packed) or 53% (delta) on the claims graph, but only about 8% or 19%
+on the dollar graph. Fractional dollar weights still require exact float64
+storage, whereas many claim weights fit narrower integer blocks. The two
+optional modes have identical store sizes because neighbor encoding applies
+only to projections. These combined-mode measurements do not isolate the CPU
+cost of block weights from neighbor decoding.
+
+Elapsed times for the count graph were:
+
+| Mode | Freeze store (s) | Build projection (s) | Katz (s) | Parallel Leiden (s) |
+|---|---:|---:|---:|---:|
+| Default | 3.52 | 47.20 | 2.68 | 16.54 |
+| Packed + blocks | 4.98 | 47.36 | 2.69 | 17.46 |
+| Delta + blocks | 5.09 | 47.50 | 6.58 | 20.84 |
+
+For the claims graph, parallel Leiden took 16.71, 18.59, and 21.06 seconds,
+respectively. Delta reduced retained memory the most, while Leiden took about
+26% longer on both views and count-graph Katz took about 2.5 times as long.
+The small differences in projection construction times should not be treated
+as reliable speed rankings from a single run.
+
+The machine was an Apple M5 Max with 128 GiB RAM, macOS arm64, Go 1.27.3,
+and DuckDB 1.4.1. Each process used `GOMAXPROCS=8`, a 40 GiB Go soft memory
+limit, and DuckDB configured for four threads and a 4 GB memory limit.
+Katz used `alpha = 0.5/(maxDegree+1)`, beta 1, tolerance 1e-8, and at most
+40 iterations. Parallel Leiden used resolution 1 and seed 42. There was one
+full run per mode, not repeated-run medians or a guarantee for other graphs.
+Katz checks topology; Leiden uses the selected weights.
+
+Loading and auditing the input took about 150–152 seconds per process. Peak
+process RSS was about 43.1 GiB for every mode, despite the 7.0–7.7 GiB retained
+store. That peak includes Go, DuckDB, builder capacity, temporary buffers, and
+algorithm allocations; it is not `StorageBytes`. The Go and DuckDB limits
+are separate controls and do not cap whole-process RSS. A compressed store
+that fits in RAM does not imply that loading it or building a projection fits.
+
+Validation covered all records and every projected edge, with independent SQL
+references for count sums, claim sums, dollar sums, a year/type selection, and
+payment maxima. Raw record hashes, projected edge hashes, Katz scores, and
+seeded Leiden partitions matched exactly across storage modes. SQL dollar
+SUM used a tolerance for differences in reduction order; its maximum observed
+absolute difference was 1.17e-10. This does not relax the bit-exact checks of
+stored values or cross-mode results.
+
+Six projections were built from each store, including an annual view repeated
+after the other passes. Results remained identical, the store's final hash was
+unchanged, and retained Go heap returned within 30 KiB of its store-only baseline
+after releasing each graph and forcing GC. This checks sequential reuse;
+retaining multiple projections concurrently adds their graph storage and
+overlapping build/algorithm working memory.
+
+For repeated analyses, reuse a projected graph while its weight, filter, and
+reducer stay the same. Build another view when those choices change, and release
+unneeded graphs before the next large build. Measure ingestion, freeze,
+projection construction, traversal, and peak RSS separately on your own data.
+Use the public synthetic benchmarks above for repeatable encoding comparisons;
+their memory savings and timings need not match this large fixture.
 
 ## Choosing the Right Algorithm Variant
 
