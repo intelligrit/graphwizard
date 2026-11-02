@@ -142,6 +142,22 @@ func ExamplePersonalizedPageRankUndirected() {
 	// Output: seed > far: true
 }
 
+func ExampleLocalPersonalizedPageRank() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	// Seed weights can combine several suspicious accounts.
+	scores, err := centrality.LocalPersonalizedPageRank(
+		context.Background(), g, map[int64]float64{0: 2, 2: 1}, 0.85, 1e-6,
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("seed 0 > seed 2: %v\n", scores[0] > scores[2])
+	// Output: seed 0 > seed 2: true
+}
+
 func ExampleInDegree() {
 	g := simple.NewDirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))

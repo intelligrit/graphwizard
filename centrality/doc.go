@@ -3,14 +3,15 @@
 // Package centrality provides node and edge centrality measures for graphs.
 //
 // This package unifies custom implementations and gonum wrappers under a
-// single import. All functions accept standard gonum graph interfaces and
-// return map[int64]float64 keyed by node ID.
+// single import. Functions accept standard gonum graph interfaces. Most node
+// scores are returned in a map[int64]float64 keyed by node ID.
 //
 // # Custom implementations (from academic papers)
 //
 //   - [Katz] / [KatzUndirected] — Katz centrality via power iteration.
 //   - [Degree] / [InDegree] / [OutDegree] — normalized degree centrality.
 //   - [PersonalizedPageRank] / [PersonalizedPageRankUndirected] — PPR relative to a seed node.
+//   - [LocalPersonalizedPageRank] — sparse multi-seed PPR via local push.
 //   - [Eccentricity] — max shortest-path distance from each node.
 //   - [Diameter] / [Radius] — graph diameter and radius.
 //   - [InfluenceMaximization] — CELF greedy seed selection for max cascade spread.
