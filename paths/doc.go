@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Intelligrit. MIT License. See LICENSE.
 
-// Package paths provides shortest-path and k-shortest-path algorithms.
+// Package paths provides path expansion and shortest-path algorithms.
 //
 // # Custom implementations (from academic papers)
 //
+//   - [ExpandPaths] — bounded, streaming expansion of simple paths.
 //   - [YenKShortest] — K shortest loopless paths in a weighted directed graph
 //     (Yen 1971). Uses Dijkstra as a subroutine.
 //

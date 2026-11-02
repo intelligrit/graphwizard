@@ -82,3 +82,18 @@ func ExampleBellmanFord() {
 	fmt.Printf("weight: %.0f, ok: %v\n", weight, ok)
 	// Output: weight: 1, ok: true
 }
+
+func ExampleExpandPaths() {
+	g := simple.NewUndirectedGraph()
+	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(1)))
+	g.SetEdge(g.NewEdge(simple.Node(1), simple.Node(2)))
+
+	target := int64(2)
+	paths.ExpandPaths(context.Background(), g, 0, paths.ExpandOptions{
+		MinHops: 1, MaxHops: 2, MaxPaths: 10, Target: &target,
+	}, func(path []int64) bool {
+		fmt.Println(path)
+		return true
+	})
+	// Output: [0 1 2]
+}
