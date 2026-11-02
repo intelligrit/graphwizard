@@ -3,6 +3,7 @@
 package anomaly_test
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/intelligrit/graphwizard/anomaly"
@@ -19,6 +20,25 @@ func ExampleDegreeZScore() {
 	scores := anomaly.DegreeZScore(g)
 	fmt.Printf("center z-score > 0: %v\n", scores[0] > 0)
 	// Output: center z-score > 0: true
+}
+
+func ExampleFindNearBicliqueBlocks() {
+	g := simple.NewUndirectedGraph()
+	for _, provider := range []int64{1, 2, 3} {
+		for _, drug := range []int64{10, 11} {
+			g.SetEdge(g.NewEdge(simple.Node(provider), simple.Node(drug)))
+		}
+	}
+	blocks, _, err := anomaly.FindNearBicliqueBlocks(context.Background(), g,
+		func(id int64) bool { return id < 10 },
+		[]anomaly.NearBicliqueSeed{{A: 1, B: 2}},
+		anomaly.DefaultNearBicliqueOptions())
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("providers=%d drugs=%d density=%.1f\n",
+		len(blocks[0].ProviderIDs), len(blocks[0].Bridges), blocks[0].Density)
+	// Output: providers=3 drugs=2 density=1.0
 }
 
 func ExampleIsolationScore() {
