@@ -66,16 +66,17 @@ go get github.com/intelligrit/graphwizard
 
 | Package | Algorithms | Source |
 |---|---|---|
+| **anomaly** | Structural outliers, local isolation, FRAUDAR weighted dense bipartite blocks, bounded seeded near-biclique groups | Custom |
 | **diskgraph** | Disk-backed Undirected/Directed graphs with optional preloading, SQLite storage | Custom |
-| **multigraph** | Distinct relationships by type/year, named weight columns, explicit projections into compact analytical graphs | Custom |
-| **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
+| **multigraph** | Distinct relationships by type/year, named weight columns, annual relationship-change and multi-year trajectory analysis, explicit projections into compact analytical graphs | Custom |
+| **centrality** | PageRank, Betweenness, Closeness, Harmonic, HITS, Katz, Degree, Personalized PageRank, sparse multi-seed Personalized PageRank, Eccentricity, Diameter, Radius, Influence Maximization | Custom + gonum |
 | **community** | Leiden, Louvain, Label Propagation, Spectral Clustering | Custom + gonum |
 | **connectivity** | Bridges, Biconnected Components, Articulation Points, WCC, SCC, Cycles, Union-Find, DAG Condensation, K-Core, Degeneracy, Topological Sort | Custom + gonum |
 | **embedding** | Node2Vec Walks, DeepWalk Walks, SVD Embedding | Custom |
 | **flow** | Max Flow (Dinic), Min Cut | Custom + gonum |
 | **matching** | Hopcroft-Karp Bipartite Matching | Custom |
-| **paths** | Dijkstra, Bellman-Ford, Floyd-Warshall, A*, Yen's K Shortest | Custom + gonum |
-| **similarity** | Jaccard, Overlap, Cosine, SimRank, Common Neighbors, Adamic-Adar, Preferential Attachment, Link Prediction | Custom |
+| **paths** | Bounded simple-path expansion, Dijkstra, Bellman-Ford, Floyd-Warshall, A*, Yen's K Shortest | Custom + gonum |
+| **similarity** | Jaccard, Overlap, Cosine, SimRank, Common Neighbors, Adamic-Adar, degree-aware bipartite overlap and bounded batch top-K, Preferential Attachment, Link Prediction | Custom |
 | **structure** | Clustering Coefficient, Triangle Count, Cliques, Coloring, Set Cover, Kruskal MST, Prim MST, TSP, Bipartite Projection | Custom + gonum |
 | **traverse** | BFS, DFS, BFS Path | gonum |
 
@@ -299,6 +300,11 @@ does not remove builder or database-driver memory costs. See
 [optional modes at scale](BEST_PRACTICES.md#optional-storage-modes-at-scale)
 for the measurement setup, other views, and repeated-pass guidance.
 
+For annual provider–entity analysis, see the [Integrity integration guide](docs/integrity-annual-analysis.md).
+It covers bounded overlap top-K, annual relationship changes, FRAUDAR blocks,
+multi-year provider trajectories, seeded near-biclique groups, and the
+historical filters needed to keep observations from different years separate.
+
 ## Best Practices
 
 See **[BEST_PRACTICES.md](BEST_PRACTICES.md)** for detailed guidance on:
@@ -324,8 +330,8 @@ a complexity reference table for every algorithm.
   academic papers, not ported from existing libraries. Each function documents
   its reference paper.
 
-- **Tested and documented.** 97.3% test coverage. 36 runnable examples. Every
-  exported function has godoc comments.
+- **Tested and documented.** Known-answer tests and runnable examples cover
+  the APIs. Exported functions have godoc comments.
 
 ## Academic References
 
@@ -338,6 +344,11 @@ a complexity reference table for every algorithm.
 | Label Propagation | Raghavan, Albert, Kumara. "Near linear time algorithm to detect community structures." *Physical Review E*, 2007 |
 | Katz Centrality | Katz. "A New Status Index Derived from Sociometric Analysis." *Psychometrika*, 1953 |
 | Personalized PageRank | Haveliwala. "Topic-Sensitive PageRank." *WWW*, 2002 |
+| Local Personalized PageRank | Andersen, Chung, Lang. ["Local Graph Partitioning using PageRank Vectors."](https://snap.stanford.edu/class/cs224w-readings/andersen06localgraph.pdf) *FOCS*, 2006 |
+| Degree-aware bipartite overlap | Tumminello et al. ["Statistically Validated Networks in Bipartite Complex Systems."](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0017994) *PLOS ONE*, 2011 |
+| Weighted dense bipartite block (FRAUDAR) | Hooi et al. ["FRAUDAR: Bounding Graph Fraud in the Face of Camouflage."](https://www.cs.cmu.edu/~christos/PUBLICATIONS/kdd16-fraudar.pdf) *KDD*, 2016 |
+| Multi-year change-point motivation | Sun et al. ["GraphScope: Parameter-Free Mining of Large Time-Evolving Graphs."](https://research.ibm.com/publications/graphscope-parameter-free-mining-of-large-time-evolving-graphs) *KDD*, 2007; GraphWizard uses a simpler peer-adjusted provider series. |
+| Multiple near-biclique motivation | Shin et al. ["M-Zoom: Fast Dense-Block Detection in Tensors with Quality Guarantees."](https://www.cs.cmu.edu/~kijungs/papers/mzoomPKDD2016.pdf) *ECML-PKDD*, 2016; Yu and Long, ["Maximum k-Biplex Search on Bipartite Graphs."](https://doi.org/10.1145/3588729) *PACMMOD*, 2023. GraphWizard uses a bounded seed heuristic. |
 | Hopcroft-Karp | Hopcroft, Karp. "An n^(5/2) Algorithm for Maximum Matchings in Bipartite Graphs." *SIAM J. Computing*, 1973 |
 | Yen's K Shortest | Yen. "Finding the K Shortest Loopless Paths in a Network." *Management Science*, 1971 |
 | Bridges | Tarjan. "A Note on Finding the Bridges of a Graph." *Information Processing Letters*, 1974 |

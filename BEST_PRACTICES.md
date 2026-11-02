@@ -435,6 +435,38 @@ guide:
   graphs, compute pairwise similarity only for nodes sharing a
   neighbor.
 
+- **Fraud seed propagation**: `LocalPersonalizedPageRank` accepts weighted
+  seeds and explores only nodes reached by local residual pushes. Tune
+  `epsilon` to trade precision for work; the returned scores are lower
+  bounds and need not sum to one. Its working maps grow with the explored
+  neighborhood, not the whole graph. One minus the sum of scores estimates
+  unpushed probability mass. On a highly connected graph, a tighter
+  `epsilon` can make the explored neighborhood approach the whole graph;
+  measure both runtime and peak memory at the chosen setting.
+
+- **Shared device or identifier evidence**: Build a
+  `BipartiteOverlapScorer` once, then call `Score` for selected account
+  pairs. It reports rarity-weighted overlap and raw hypergeometric
+  probabilities within bridge-degree bins without constructing a projected
+  graph. Correct the probabilities for all pairs and bins tested before
+  calling them statistically significant. The scorer retains a histogram
+  of bridge degrees; each pair uses memory proportional to one account's
+  neighbors and the degree bins it touches. Graph implementations may
+  buffer an individual node's neighbors, and iterator allocation can raise
+  temporary heap usage during the full-graph preparation scan.
+
+- **Large annual bipartite views**: Use `VisitBatchBipartiteOverlap` with a
+  bridge-degree cutoff and a measured per-provider candidate cap. Increasing
+  the cap from 512 to 2,048 on the 2023 Medicare prescribing projection cut
+  capped provider searches from 92,628 to 10,919, while increasing overlap
+  time from 9.72 to 11.70 seconds. Keep `TruncatedLeftNodes` in the result
+  metadata. Seed `FindNearBicliqueBlocks` from bounded overlap pairs on the
+  same year and relationship type; its search is local and non-exhaustive.
+  `VisitAnnualTrajectories` reads the immutable relationship store directly,
+  requires observed years, and uses memory proportional to providers times
+  the requested year count. See the [Integrity annual analysis guide](docs/integrity-annual-analysis.md)
+  for boundaries and the full-scale benchmark.
+
 ## Loading Graphs from SQL
 
 For small-to-medium graphs, use the `loader` package to load directly
@@ -608,10 +640,14 @@ fmt.Printf("New edges: %d, Removed: %d\n",
 | Betweenness (approx) | O(kE) | O(V+E) | Per-source |
 | Leiden/Louvain | ~O(V+E) | O(V+E) | Limited |
 | Katz/PPR | O(k(V+E)) | O(V) | Per-node |
+| Batch bipartite overlap | O(E + pair encounters + P·C log C), with candidate cap C | O(V+C+D), with eligible bridge-degree cap D | Per-provider |
+| Seeded near-biclique blocks | O(E + bounded local scans per seed) | O(V + candidate caps + retained blocks) | Per-seed |
+| Annual provider trajectories | O(E + P·Y²), Y ≤ 16 | O(P·Y) | Per-provider after peer summary |
 | Triangle count | O(V·d²) | O(V+E) | Per-node |
 | Clustering coeff | O(V·d²) | O(V+E) | Per-node |
 | MST (Kruskal) | O(E log E) | O(V+E) | No |
 | Hopcroft-Karp | O(E√V) | O(V+E) | No |
+| Bounded path expansion | O(explored path steps), potentially exponential in hop limit | O(hop limit + active neighbor iterators) | No |
 | Yen K-shortest | O(KV(V log V + E)) | O(V+E) | Per-spur |
 | SimRank | O(kV²d²) | O(V²) | Per-iteration |
 | Node2Vec walks | O(walks·length) | O(walks·length) | Per-walk |
