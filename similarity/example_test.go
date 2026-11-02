@@ -24,6 +24,26 @@ func ExampleJaccard() {
 	// Output: J(0,1) = 0.3333
 }
 
+func ExampleBipartiteOverlapScorer() {
+	g := simple.NewUndirectedGraph()
+	// Accounts 0 and 1 both use devices 10 and 11; account 2 uses 11.
+	for _, e := range [][2]int64{{0, 10}, {0, 11}, {1, 10}, {1, 11}, {2, 11}} {
+		g.SetEdge(g.NewEdge(simple.Node(e[0]), simple.Node(e[1])))
+	}
+	scorer, err := similarity.NewBipartiteOverlapScorer(
+		context.Background(), g, func(id int64) bool { return id < 10 },
+	)
+	if err != nil {
+		panic(err)
+	}
+	result, err := scorer.Score(context.Background(), 0, 1)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("shared=%d rarity=%.2f\n", result.Shared, result.RarityScore)
+	// Output: shared=2 rarity=0.83
+}
+
 func ExampleOverlap() {
 	g := simple.NewUndirectedGraph()
 	g.SetEdge(g.NewEdge(simple.Node(0), simple.Node(2)))
