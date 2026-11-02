@@ -13,4 +13,7 @@
 // is preserved in the store; an undirected projection combines both orientations.
 // Type and year are application-supplied labels, not inferred temporal semantics.
 // Zero year conventionally denotes an undated relationship.
+// VisitAnnualChanges compares two explicitly selected positive years without
+// constructing or retaining two graph projections. VisitAnnualTrajectories
+// scores sustained provider-level changes across a requested annual series.
 package multigraph
