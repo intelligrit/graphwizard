@@ -300,11 +300,6 @@ does not remove builder or database-driver memory costs. See
 [optional modes at scale](BEST_PRACTICES.md#optional-storage-modes-at-scale)
 for the measurement setup, other views, and repeated-pass guidance.
 
-For annual provider–entity analysis, see the [Integrity integration guide](docs/integrity-annual-analysis.md).
-It covers bounded overlap top-K, annual relationship changes, FRAUDAR blocks,
-multi-year provider trajectories, seeded near-biclique groups, and the
-historical filters needed to keep observations from different years separate.
-
 ## Best Practices
 
 See **[BEST_PRACTICES.md](BEST_PRACTICES.md)** for detailed guidance on:

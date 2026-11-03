@@ -464,8 +464,7 @@ guide:
   same year and relationship type; its search is local and non-exhaustive.
   `VisitAnnualTrajectories` reads the immutable relationship store directly,
   requires observed years, and uses memory proportional to providers times
-  the requested year count. See the [Integrity annual analysis guide](docs/integrity-annual-analysis.md)
-  for boundaries and the full-scale benchmark.
+  the requested year count.
 
 ## Loading Graphs from SQL
 
